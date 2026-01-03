@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { MainLayout } from '@/components/Layout';
 import { ProjectList, NewProjectDialog } from '@/components/FileManager';
-import { GridCanvas, Toolbar } from '@/components/Editor';
-import { PalettePanel } from '@/components/Palette';
+import { GridCanvas, FreeformCanvas, Toolbar } from '@/components/Editor';
+import { PalettePanel, SymbolPicker } from '@/components/Palette';
+import { LayerPanel } from '@/components/Layers';
 import { ExportDialog, ImportDialog, WrittenInstructionsDialog } from '@/components/Export';
 import { ImageImportDialog } from '@/components/Import';
 import { ProgressPanel } from '@/components/Progress';
@@ -11,6 +12,7 @@ import { useUIStore } from '@/stores/uiStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useKeyboardShortcuts, useAutoSave } from '@/hooks';
+import type { SymbolDefinition } from '@/types';
 
 function App() {
   const view = useUIStore((state) => state.view);
@@ -48,9 +50,17 @@ function App() {
 // Editor view with grid canvas and palette
 function EditorView() {
   const project = useProjectStore((state) => state.project);
+  const activeSymbolId = useProjectStore((state) => state.activeSymbolId);
+  const setActiveSymbol = useProjectStore((state) => state.setActiveSymbol);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   if (!project) return null;
+
+  const isFreeform = project.chartType === 'freeform';
+
+  const handleSymbolSelect = (symbol: SymbolDefinition) => {
+    setActiveSymbol(symbol.id);
+  };
 
   return (
     <div className="flex h-full relative">
@@ -63,16 +73,39 @@ function EditorView() {
         <span className="text-lg">{sidebarOpen ? '◀' : '▶'}</span>
       </button>
 
-      {/* Color palette sidebar */}
+      {/* Sidebar */}
       <div
         className={`flex flex-col w-64 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-all duration-300 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } md:translate-x-0 absolute md:relative h-full z-40`}
       >
-        <div className="flex-1 overflow-hidden">
-          <PalettePanel />
-        </div>
-        <ProgressPanel />
+        {isFreeform ? (
+          <>
+            {/* Freeform mode: Symbol picker + Colors + Layers */}
+            <div className="flex-1 overflow-hidden flex flex-col">
+              <div className="h-48 border-b border-gray-200 dark:border-gray-700">
+                <SymbolPicker
+                  selectedSymbolId={activeSymbolId}
+                  onSelect={handleSymbolSelect}
+                />
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <PalettePanel />
+              </div>
+            </div>
+            <div className="h-48 border-t border-gray-200 dark:border-gray-700">
+              <LayerPanel />
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Grid mode: Colors + Progress */}
+            <div className="flex-1 overflow-hidden">
+              <PalettePanel />
+            </div>
+            <ProgressPanel />
+          </>
+        )}
       </div>
 
       {/* Sidebar overlay for mobile */}
@@ -90,7 +123,7 @@ function EditorView() {
 
         {/* Canvas */}
         <div className="flex-1">
-          <GridCanvas />
+          {isFreeform ? <FreeformCanvas /> : <GridCanvas />}
         </div>
       </div>
     </div>

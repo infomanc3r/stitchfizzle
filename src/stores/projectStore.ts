@@ -9,6 +9,8 @@ import type {
   EditorTool,
   Selection,
   ProgressState,
+  Layer,
+  PlacedSymbol,
 } from '@/types';
 import { createDefaultProject, DEFAULT_CHART_SETTINGS } from '@/types';
 import { saveProject, getProject } from '@/services/db';
@@ -28,6 +30,8 @@ interface ProjectState {
   // Editor state
   activeTool: EditorTool;
   activeColorId: string | null;
+  activeSymbolId: string | null;
+  selectedSymbolInstanceId: string | null;
   selection: Selection | null;
   zoom: number;
   panOffset: { x: number; y: number };
@@ -91,6 +95,25 @@ interface ProjectState {
   prevProgressRow: () => void;
   updateProgressSettings: (settings: Partial<ProgressState>) => void;
   clearProgressTracker: () => void;
+
+  // Freeform mode - symbols
+  setActiveSymbol: (symbolId: string | null) => void;
+  setSelectedSymbolInstance: (instanceId: string | null) => void;
+
+  // Freeform mode - layers
+  addLayer: () => Layer | null;
+  removeLayer: (layerId: string) => void;
+  updateLayer: (layerId: string, updates: Partial<Layer>) => void;
+  setActiveLayer: (layerId: string) => void;
+  reorderLayers: (layerIds: string[]) => void;
+
+  // Freeform mode - placed symbols
+  addPlacedSymbol: (symbolId: string, x: number, y: number) => PlacedSymbol | null;
+  removePlacedSymbol: (symbolInstanceId: string) => void;
+  updatePlacedSymbol: (symbolInstanceId: string, updates: Partial<PlacedSymbol>) => void;
+  movePlacedSymbol: (symbolInstanceId: string, x: number, y: number) => void;
+  rotatePlacedSymbol: (symbolInstanceId: string, rotation: number) => void;
+  scalePlacedSymbol: (symbolInstanceId: string, scale: number) => void;
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
@@ -98,6 +121,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   isDirty: false,
   activeTool: 'draw',
   activeColorId: null,
+  activeSymbolId: null,
+  selectedSymbolInstanceId: null,
   selection: null,
   zoom: 1,
   panOffset: { x: 0, y: 0 },
@@ -704,5 +729,218 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       },
       isDirty: true,
     });
+  },
+
+  // Freeform mode - symbols
+  setActiveSymbol: (symbolId) => set({ activeSymbolId: symbolId }),
+  setSelectedSymbolInstance: (instanceId) => set({ selectedSymbolInstanceId: instanceId }),
+
+  // Freeform mode - layers
+  addLayer: () => {
+    const { project } = get();
+    if (!project?.freeform) return null;
+
+    const newLayer: Layer = {
+      id: uuidv4(),
+      name: `Layer ${project.freeform.layers.length + 1}`,
+      visible: true,
+      locked: false,
+      symbols: [],
+    };
+
+    set({
+      project: {
+        ...project,
+        freeform: {
+          ...project.freeform,
+          layers: [...project.freeform.layers, newLayer],
+        },
+        updatedAt: new Date(),
+      },
+      isDirty: true,
+    });
+
+    return newLayer;
+  },
+
+  removeLayer: (layerId) => {
+    const { project } = get();
+    if (!project?.freeform || project.freeform.layers.length <= 1) return;
+
+    get().pushUndoState();
+
+    const newLayers = project.freeform.layers.filter((l) => l.id !== layerId);
+    const newActiveLayerId =
+      project.freeform.activeLayerId === layerId
+        ? newLayers[0].id
+        : project.freeform.activeLayerId;
+
+    set({
+      project: {
+        ...project,
+        freeform: {
+          ...project.freeform,
+          layers: newLayers,
+          activeLayerId: newActiveLayerId,
+        },
+        updatedAt: new Date(),
+      },
+      isDirty: true,
+    });
+  },
+
+  updateLayer: (layerId, updates) => {
+    const { project } = get();
+    if (!project?.freeform) return;
+
+    set({
+      project: {
+        ...project,
+        freeform: {
+          ...project.freeform,
+          layers: project.freeform.layers.map((l) =>
+            l.id === layerId ? { ...l, ...updates } : l
+          ),
+        },
+        updatedAt: new Date(),
+      },
+      isDirty: true,
+    });
+  },
+
+  setActiveLayer: (layerId) => {
+    const { project } = get();
+    if (!project?.freeform) return;
+
+    set({
+      project: {
+        ...project,
+        freeform: {
+          ...project.freeform,
+          activeLayerId: layerId,
+        },
+        updatedAt: new Date(),
+      },
+      isDirty: true,
+    });
+  },
+
+  reorderLayers: (layerIds) => {
+    const { project } = get();
+    if (!project?.freeform) return;
+
+    const layerMap = new Map(project.freeform.layers.map((l) => [l.id, l]));
+    const newLayers = layerIds.map((id) => layerMap.get(id)!).filter(Boolean);
+
+    set({
+      project: {
+        ...project,
+        freeform: {
+          ...project.freeform,
+          layers: newLayers,
+        },
+        updatedAt: new Date(),
+      },
+      isDirty: true,
+    });
+  },
+
+  // Freeform mode - placed symbols
+  addPlacedSymbol: (symbolId, x, y) => {
+    const { project, activeColorId } = get();
+    if (!project?.freeform) return null;
+
+    get().pushUndoState();
+
+    const activeLayer = project.freeform.layers.find(
+      (l) => l.id === project.freeform!.activeLayerId
+    );
+    if (!activeLayer || activeLayer.locked) return null;
+
+    const newSymbol: PlacedSymbol = {
+      id: uuidv4(),
+      symbolId,
+      colorId: activeColorId || project.palette[0]?.id || '',
+      x,
+      y,
+      rotation: 0,
+      scale: 1,
+    };
+
+    set({
+      project: {
+        ...project,
+        freeform: {
+          ...project.freeform,
+          layers: project.freeform.layers.map((l) =>
+            l.id === activeLayer.id
+              ? { ...l, symbols: [...l.symbols, newSymbol] }
+              : l
+          ),
+        },
+        updatedAt: new Date(),
+      },
+      isDirty: true,
+      selectedSymbolInstanceId: newSymbol.id,
+    });
+
+    return newSymbol;
+  },
+
+  removePlacedSymbol: (symbolInstanceId) => {
+    const { project } = get();
+    if (!project?.freeform) return;
+
+    get().pushUndoState();
+
+    set({
+      project: {
+        ...project,
+        freeform: {
+          ...project.freeform,
+          layers: project.freeform.layers.map((l) => ({
+            ...l,
+            symbols: l.symbols.filter((s) => s.id !== symbolInstanceId),
+          })),
+        },
+        updatedAt: new Date(),
+      },
+      isDirty: true,
+      selectedSymbolInstanceId: null,
+    });
+  },
+
+  updatePlacedSymbol: (symbolInstanceId, updates) => {
+    const { project } = get();
+    if (!project?.freeform) return;
+
+    set({
+      project: {
+        ...project,
+        freeform: {
+          ...project.freeform,
+          layers: project.freeform.layers.map((l) => ({
+            ...l,
+            symbols: l.symbols.map((s) =>
+              s.id === symbolInstanceId ? { ...s, ...updates } : s
+            ),
+          })),
+        },
+        updatedAt: new Date(),
+      },
+      isDirty: true,
+    });
+  },
+
+  movePlacedSymbol: (symbolInstanceId, x, y) => {
+    get().updatePlacedSymbol(symbolInstanceId, { x, y });
+  },
+
+  rotatePlacedSymbol: (symbolInstanceId, rotation) => {
+    get().updatePlacedSymbol(symbolInstanceId, { rotation });
+  },
+
+  scalePlacedSymbol: (symbolInstanceId, scale) => {
+    get().updatePlacedSymbol(symbolInstanceId, { scale: Math.max(0.1, scale) });
   },
 }));
