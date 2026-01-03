@@ -1,8 +1,158 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { Canvas, Rect, Line } from 'fabric';
+import { Canvas, Rect, Line, Path, type FabricObject } from 'fabric';
 import { useProjectStore } from '@/stores/projectStore';
+import type { ChartType } from '@/types';
 
 const CELL_SIZE = 20; // Base cell size in pixels
+
+// Create chart-type-specific cell visual
+function createCellVisual(
+  chartType: ChartType,
+  x: number,
+  y: number,
+  size: number,
+  color: string,
+  hasSymbol: boolean
+): FabricObject[] {
+  const objects: FabricObject[] = [];
+
+  switch (chartType) {
+    case 'filet': {
+      // Filet crochet: filled cells have X pattern, empty cells are just outlined
+      objects.push(
+        new Rect({
+          left: x,
+          top: y,
+          width: size,
+          height: size,
+          fill: color,
+          selectable: false,
+          evented: false,
+        })
+      );
+      // Add X pattern for filled cells
+      if (color !== 'transparent') {
+        const padding = size * 0.15;
+        objects.push(
+          new Line([x + padding, y + padding, x + size - padding, y + size - padding], {
+            stroke: '#333',
+            strokeWidth: Math.max(1, size * 0.08),
+            selectable: false,
+            evented: false,
+          })
+        );
+        objects.push(
+          new Line([x + size - padding, y + padding, x + padding, y + size - padding], {
+            stroke: '#333',
+            strokeWidth: Math.max(1, size * 0.08),
+            selectable: false,
+            evented: false,
+          })
+        );
+      }
+      break;
+    }
+
+    case 'mosaic': {
+      // Mosaic crochet: base color with optional overlay X
+      objects.push(
+        new Rect({
+          left: x,
+          top: y,
+          width: size,
+          height: size,
+          fill: color,
+          selectable: false,
+          evented: false,
+        })
+      );
+      // Add overlay X symbol if cell has a symbol assigned
+      if (hasSymbol) {
+        const padding = size * 0.2;
+        objects.push(
+          new Line([x + padding, y + padding, x + size - padding, y + size - padding], {
+            stroke: '#000',
+            strokeWidth: Math.max(2, size * 0.1),
+            selectable: false,
+            evented: false,
+          })
+        );
+        objects.push(
+          new Line([x + size - padding, y + padding, x + padding, y + size - padding], {
+            stroke: '#000',
+            strokeWidth: Math.max(2, size * 0.1),
+            selectable: false,
+            evented: false,
+          })
+        );
+      }
+      break;
+    }
+
+    case 'c2c': {
+      // Corner-to-corner: rotated diamond/square blocks
+      const centerX = x + size / 2;
+      const centerY = y + size / 2;
+
+      // Create diamond shape (rotated square)
+      const pathStr = `M ${centerX} ${y + size * 0.05} L ${x + size * 0.95} ${centerY} L ${centerX} ${y + size * 0.95} L ${x + size * 0.05} ${centerY} Z`;
+      objects.push(
+        new Path(pathStr, {
+          fill: color,
+          stroke: '#666',
+          strokeWidth: 1,
+          selectable: false,
+          evented: false,
+        })
+      );
+      break;
+    }
+
+    case 'tunisian': {
+      // Tunisian: standard cells with vertical stitch lines
+      objects.push(
+        new Rect({
+          left: x,
+          top: y,
+          width: size,
+          height: size,
+          fill: color,
+          selectable: false,
+          evented: false,
+        })
+      );
+      // Add vertical stitch line for visual
+      if (color !== 'transparent') {
+        objects.push(
+          new Line([x + size / 2, y + size * 0.1, x + size / 2, y + size * 0.9], {
+            stroke: 'rgba(0,0,0,0.3)',
+            strokeWidth: Math.max(1, size * 0.05),
+            selectable: false,
+            evented: false,
+          })
+        );
+      }
+      break;
+    }
+
+    default: {
+      // colorwork and freeform: simple filled rectangle
+      objects.push(
+        new Rect({
+          left: x,
+          top: y,
+          width: size,
+          height: size,
+          fill: color,
+          selectable: false,
+          evented: false,
+        })
+      );
+    }
+  }
+
+  return objects;
+}
 
 export function GridCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -25,6 +175,8 @@ export function GridCanvas() {
   const lastCellRef = useRef<{ row: number; col: number } | null>(null);
   const drawnCellsRef = useRef<Set<string>>(new Set());
   const selectionStartRef = useRef<{ row: number; col: number } | null>(null);
+  const lastTouchDistRef = useRef<number | null>(null);
+  const lastTouchCenterRef = useRef<{ x: number; y: number } | null>(null);
 
   // Initialize canvas
   useEffect(() => {
@@ -81,23 +233,19 @@ export function GridCanvas() {
     const startRow = Math.max(0, Math.floor(-offsetY / scaledCellSize));
     const endRow = Math.min(height, Math.ceil((canvasHeight - offsetY) / scaledCellSize));
 
-    // Draw cells
+    // Draw cells with chart-type-specific visuals
+    const chartType = project.chartType;
     for (let row = startRow; row < endRow; row++) {
       for (let col = startCol; col < endCol; col++) {
         const cell = cells[row]?.[col];
         if (cell?.colorId) {
           const color = project.palette.find((p) => p.id === cell.colorId)?.color;
           if (color) {
-            const rect = new Rect({
-              left: offsetX + col * scaledCellSize,
-              top: offsetY + row * scaledCellSize,
-              width: scaledCellSize,
-              height: scaledCellSize,
-              fill: color,
-              selectable: false,
-              evented: false,
-            });
-            canvas.add(rect);
+            const cellX = offsetX + col * scaledCellSize;
+            const cellY = offsetY + row * scaledCellSize;
+            const hasSymbol = !!cell.symbolId;
+            const cellVisuals = createCellVisual(chartType, cellX, cellY, scaledCellSize, color, hasSymbol);
+            cellVisuals.forEach((obj) => canvas.add(obj));
           }
         }
       }
@@ -141,6 +289,31 @@ export function GridCanvas() {
           evented: false,
         });
         canvas.add(line);
+      }
+    }
+
+    // Draw Tunisian forward/return pass markers
+    if (chartType === 'tunisian') {
+      for (let row = startRow; row < endRow; row++) {
+        const isReturnPass = row % 2 === 1;
+        const markerX = offsetX - 25;
+        const markerY = offsetY + row * scaledCellSize + scaledCellSize / 2;
+
+        // Draw arrow indicator
+        if (markerX > -30) {
+          const arrowPath = isReturnPass
+            ? `M ${markerX + 20} ${markerY} L ${markerX + 5} ${markerY} L ${markerX + 10} ${markerY - 4} M ${markerX + 5} ${markerY} L ${markerX + 10} ${markerY + 4}`
+            : `M ${markerX + 5} ${markerY} L ${markerX + 20} ${markerY} L ${markerX + 15} ${markerY - 4} M ${markerX + 20} ${markerY} L ${markerX + 15} ${markerY + 4}`;
+
+          const arrow = new Path(arrowPath, {
+            stroke: isReturnPass ? '#E11D48' : '#2563EB',
+            strokeWidth: 2,
+            fill: 'transparent',
+            selectable: false,
+            evented: false,
+          });
+          canvas.add(arrow);
+        }
       }
     }
 
@@ -353,28 +526,190 @@ export function GridCanvas() {
     [zoom]
   );
 
-  // Eyedropper tool
+  // Eyedropper and Fill tool
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
-      if (activeTool !== 'eyedropper') return;
-
       const cell = getCellFromEvent(e);
       if (!cell || !project?.grid) return;
 
-      const cellData = project.grid.cells[cell.row]?.[cell.col];
-      if (cellData?.colorId) {
-        useProjectStore.getState().setActiveColor(cellData.colorId);
-        useProjectStore.getState().setActiveTool('draw');
+      if (activeTool === 'eyedropper') {
+        const cellData = project.grid.cells[cell.row]?.[cell.col];
+        if (cellData?.colorId) {
+          useProjectStore.getState().setActiveColor(cellData.colorId);
+          useProjectStore.getState().setActiveTool('draw');
+        }
+      } else if (activeTool === 'fill') {
+        useProjectStore.getState().floodFill(cell.row, cell.col, activeColorId);
       }
     },
-    [activeTool, getCellFromEvent, project?.grid]
+    [activeTool, activeColorId, getCellFromEvent, project?.grid]
   );
+
+  // Get cell from touch position
+  const getCellFromTouch = useCallback(
+    (touch: React.Touch): { row: number; col: number } | null => {
+      if (!containerRef.current || !project?.settings) return null;
+
+      const rect = containerRef.current.getBoundingClientRect();
+      const x = touch.clientX - rect.left - panOffset.x;
+      const y = touch.clientY - rect.top - panOffset.y;
+
+      const scaledCellSize = CELL_SIZE * zoom;
+      const col = Math.floor(x / scaledCellSize);
+      const row = Math.floor(y / scaledCellSize);
+
+      if (col >= 0 && col < project.settings.width && row >= 0 && row < project.settings.height) {
+        return { row, col };
+      }
+      return null;
+    },
+    [zoom, panOffset, project?.settings]
+  );
+
+  // Touch handlers for mobile support
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      setContextMenu(null);
+
+      if (e.touches.length === 2) {
+        // Two-finger touch: prepare for pinch-to-zoom
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
+        const dist = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
+        lastTouchDistRef.current = dist;
+        lastTouchCenterRef.current = {
+          x: (touch1.clientX + touch2.clientX) / 2,
+          y: (touch1.clientY + touch2.clientY) / 2,
+        };
+        return;
+      }
+
+      if (e.touches.length !== 1) return;
+
+      const touch = e.touches[0];
+
+      if (activeTool === 'pan') {
+        isDrawingRef.current = true;
+        lastTouchCenterRef.current = { x: touch.clientX, y: touch.clientY };
+        return;
+      }
+
+      if (activeTool === 'select') {
+        const cell = getCellFromTouch(touch);
+        if (!cell) return;
+        isDrawingRef.current = true;
+        selectionStartRef.current = cell;
+        setSelection({ startRow: cell.row, startCol: cell.col, endRow: cell.row, endCol: cell.col });
+        return;
+      }
+
+      if (activeTool === 'eyedropper' || activeTool === 'fill') {
+        const cell = getCellFromTouch(touch);
+        if (!cell || !project?.grid) return;
+
+        if (activeTool === 'eyedropper') {
+          const cellData = project.grid.cells[cell.row]?.[cell.col];
+          if (cellData?.colorId) {
+            useProjectStore.getState().setActiveColor(cellData.colorId);
+            useProjectStore.getState().setActiveTool('draw');
+          }
+        } else {
+          useProjectStore.getState().floodFill(cell.row, cell.col, activeColorId);
+        }
+        return;
+      }
+
+      if (activeTool !== 'draw' && activeTool !== 'erase') return;
+
+      const cell = getCellFromTouch(touch);
+      if (!cell) return;
+
+      isDrawingRef.current = true;
+      drawnCellsRef.current.clear();
+      lastCellRef.current = cell;
+
+      const colorToSet = activeTool === 'draw' ? activeColorId : null;
+      setCell(cell.row, cell.col, colorToSet);
+      drawnCellsRef.current.add(`${cell.row},${cell.col}`);
+    },
+    [activeTool, activeColorId, getCellFromTouch, setCell, setSelection, project?.grid]
+  );
+
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent) => {
+      if (e.touches.length === 2) {
+        // Pinch-to-zoom
+        e.preventDefault();
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
+        const dist = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
+
+        if (lastTouchDistRef.current !== null) {
+          const scale = dist / lastTouchDistRef.current;
+          const newZoom = Math.max(0.1, Math.min(10, zoom * scale));
+          useProjectStore.getState().setZoom(newZoom);
+        }
+
+        lastTouchDistRef.current = dist;
+        return;
+      }
+
+      if (!isDrawingRef.current || e.touches.length !== 1) return;
+
+      const touch = e.touches[0];
+
+      if (activeTool === 'pan' && lastTouchCenterRef.current) {
+        const dx = touch.clientX - lastTouchCenterRef.current.x;
+        const dy = touch.clientY - lastTouchCenterRef.current.y;
+        setPanOffset({ x: panOffset.x + dx, y: panOffset.y + dy });
+        lastTouchCenterRef.current = { x: touch.clientX, y: touch.clientY };
+        return;
+      }
+
+      if (activeTool === 'select' && selectionStartRef.current) {
+        const cell = getCellFromTouch(touch);
+        if (!cell) return;
+        setSelection({
+          startRow: selectionStartRef.current.row,
+          startCol: selectionStartRef.current.col,
+          endRow: cell.row,
+          endCol: cell.col,
+        });
+        return;
+      }
+
+      if (activeTool !== 'draw' && activeTool !== 'erase') return;
+
+      const cell = getCellFromTouch(touch);
+      if (!cell) return;
+
+      const cellKey = `${cell.row},${cell.col}`;
+      if (drawnCellsRef.current.has(cellKey)) return;
+
+      const colorToSet = activeTool === 'draw' ? activeColorId : null;
+      setCell(cell.row, cell.col, colorToSet);
+      drawnCellsRef.current.add(cellKey);
+      lastCellRef.current = cell;
+    },
+    [activeTool, activeColorId, getCellFromTouch, setCell, panOffset, setPanOffset, setSelection, zoom]
+  );
+
+  const handleTouchEnd = useCallback(() => {
+    isDrawingRef.current = false;
+    lastCellRef.current = null;
+    drawnCellsRef.current.clear();
+    selectionStartRef.current = null;
+    lastTouchDistRef.current = null;
+    lastTouchCenterRef.current = null;
+  }, []);
 
   const getCursor = () => {
     switch (activeTool) {
       case 'draw':
         return 'crosshair';
       case 'erase':
+        return 'crosshair';
+      case 'fill':
         return 'crosshair';
       case 'select':
         return 'crosshair';
@@ -390,7 +725,7 @@ export function GridCanvas() {
   return (
     <div
       ref={containerRef}
-      className="w-full h-full overflow-hidden bg-gray-100 dark:bg-gray-900 relative"
+      className="w-full h-full overflow-hidden bg-gray-100 dark:bg-gray-900 relative touch-none"
       style={{ cursor: getCursor() }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -399,6 +734,10 @@ export function GridCanvas() {
       onWheel={handleWheel}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
     >
       <canvas ref={canvasRef} />
 

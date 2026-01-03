@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { MainLayout } from '@/components/Layout';
 import { ProjectList, NewProjectDialog } from '@/components/FileManager';
 import { GridCanvas, Toolbar } from '@/components/Editor';
@@ -48,21 +48,43 @@ function App() {
 // Editor view with grid canvas and palette
 function EditorView() {
   const project = useProjectStore((state) => state.project);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   if (!project) return null;
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full relative">
+      {/* Mobile sidebar toggle */}
+      <button
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        className="md:hidden absolute top-2 left-2 z-50 w-10 h-10 bg-white dark:bg-gray-800 rounded-lg shadow-lg flex items-center justify-center border border-gray-200 dark:border-gray-700"
+        title={sidebarOpen ? 'Hide palette' : 'Show palette'}
+      >
+        <span className="text-lg">{sidebarOpen ? '◀' : '▶'}</span>
+      </button>
+
       {/* Color palette sidebar */}
-      <div className="flex flex-col w-64 border-r border-gray-200 dark:border-gray-700">
+      <div
+        className={`flex flex-col w-64 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-all duration-300 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        } md:translate-x-0 absolute md:relative h-full z-40`}
+      >
         <div className="flex-1 overflow-hidden">
           <PalettePanel />
         </div>
         <ProgressPanel />
       </div>
 
+      {/* Sidebar overlay for mobile */}
+      {sidebarOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/30 z-30"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Canvas area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Toolbar */}
         <Toolbar />
 

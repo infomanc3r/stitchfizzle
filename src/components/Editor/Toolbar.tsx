@@ -26,6 +26,7 @@ export function Toolbar() {
   const tools: { id: EditorTool; label: string; icon: string; shortcut: string }[] = [
     { id: 'draw', label: 'Draw', icon: '✏️', shortcut: 'D' },
     { id: 'erase', label: 'Erase', icon: '🧹', shortcut: 'E' },
+    { id: 'fill', label: 'Fill', icon: '🪣', shortcut: 'F' },
     { id: 'select', label: 'Select', icon: '⬚', shortcut: 'S' },
     { id: 'eyedropper', label: 'Eyedropper', icon: '💧', shortcut: 'I' },
     { id: 'pan', label: 'Pan', icon: '✋', shortcut: 'Space' },
@@ -79,9 +80,9 @@ export function Toolbar() {
   };
 
   return (
-    <div className="flex items-center gap-2 p-2 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+    <div className="flex items-center gap-2 p-2 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 overflow-x-auto scrollbar-thin">
       {/* Tool buttons */}
-      <div className="flex items-center gap-1 pr-2 border-r border-gray-200 dark:border-gray-600">
+      <div className="flex items-center gap-1 pr-2 border-r border-gray-200 dark:border-gray-600 flex-shrink-0">
         {tools.map((tool) => (
           <button
             key={tool.id}
@@ -99,7 +100,7 @@ export function Toolbar() {
       </div>
 
       {/* Undo/Redo */}
-      <div className="flex items-center gap-1 pr-2 border-r border-gray-200 dark:border-gray-600">
+      <div className="flex items-center gap-1 pr-2 border-r border-gray-200 dark:border-gray-600 flex-shrink-0">
         <button
           onClick={undo}
           disabled={undoStack.length === 0}
@@ -119,7 +120,7 @@ export function Toolbar() {
       </div>
 
       {/* Zoom controls */}
-      <div className="flex items-center gap-1 pr-2 border-r border-gray-200 dark:border-gray-600">
+      <div className="flex items-center gap-1 pr-2 border-r border-gray-200 dark:border-gray-600 flex-shrink-0">
         <button
           onClick={() => setZoom(zoom - 0.25)}
           disabled={zoom <= 0.25}
@@ -150,7 +151,7 @@ export function Toolbar() {
 
       {/* Row/Column operations (only when selection exists) */}
       {selection && (
-        <div className="flex items-center gap-1 pr-2 border-r border-gray-200 dark:border-gray-600">
+        <div className="flex items-center gap-1 pr-2 border-r border-gray-200 dark:border-gray-600 flex-shrink-0">
           <div className="relative group">
             <button
               title="Row operations"
@@ -215,7 +216,7 @@ export function Toolbar() {
       )}
 
       {/* Grid size */}
-      <div className="flex items-center gap-1 pr-2 border-r border-gray-200 dark:border-gray-600">
+      <div className="flex items-center gap-1 pr-2 border-r border-gray-200 dark:border-gray-600 flex-shrink-0">
         <button
           onClick={() => setShowGridDialog(true)}
           title="Resize grid"
@@ -226,7 +227,7 @@ export function Toolbar() {
       </div>
 
       {/* Export & Instructions */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 flex-shrink-0">
         <button
           onClick={() => openDialog('writtenInstructions')}
           title="Generate written instructions"

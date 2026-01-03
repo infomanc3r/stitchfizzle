@@ -46,6 +46,10 @@ export function useKeyboardShortcuts() {
             e.preventDefault();
             setActiveTool('erase');
             break;
+          case 'f':
+            e.preventDefault();
+            setActiveTool('fill');
+            break;
           case 's':
             e.preventDefault();
             setActiveTool('select');
