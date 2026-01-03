@@ -37,7 +37,7 @@ jobs:
         run: npm run build
         env:
           # Set base path for GitHub Pages (change 'stitchfizzle' to your repo name)
-          VITE_BASE_PATH: /stitchfizzle/
+          VITE_BASE_PATH: /
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
