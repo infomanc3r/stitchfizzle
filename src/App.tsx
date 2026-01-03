@@ -4,11 +4,13 @@ import { ProjectList, NewProjectDialog } from '@/components/FileManager';
 import { GridCanvas, Toolbar } from '@/components/Editor';
 import { PalettePanel } from '@/components/Palette';
 import { ExportDialog, ImportDialog, WrittenInstructionsDialog } from '@/components/Export';
+import { ImageImportDialog } from '@/components/Import';
 import { ProgressPanel } from '@/components/Progress';
+import { SettingsDialog } from '@/components/Settings';
 import { useUIStore } from '@/stores/uiStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useProjectStore } from '@/stores/projectStore';
-import { useKeyboardShortcuts } from '@/hooks';
+import { useKeyboardShortcuts, useAutoSave } from '@/hooks';
 
 function App() {
   const view = useUIStore((state) => state.view);
@@ -24,6 +26,9 @@ function App() {
   // Enable keyboard shortcuts
   useKeyboardShortcuts();
 
+  // Enable auto-save
+  useAutoSave();
+
   return (
     <MainLayout>
       {view === 'projects' && <ProjectList />}
@@ -33,7 +38,9 @@ function App() {
       {activeDialog === 'newProject' && <NewProjectDialog />}
       {activeDialog === 'export' && <ExportDialog />}
       {activeDialog === 'import' && <ImportDialog />}
+      {activeDialog === 'imageImport' && <ImageImportDialog />}
       {activeDialog === 'writtenInstructions' && <WrittenInstructionsDialog />}
+      {activeDialog === 'settings' && <SettingsDialog />}
     </MainLayout>
   );
 }

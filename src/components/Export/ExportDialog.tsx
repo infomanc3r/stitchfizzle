@@ -6,11 +6,12 @@ import {
   downloadPNG,
   downloadSVG,
   downloadPDF,
+  downloadXLSX,
   type PNGSize,
   type PDFPageCount,
 } from '@/services/exporters';
 
-type ExportFormat = 'json' | 'png' | 'svg' | 'pdf';
+type ExportFormat = 'json' | 'png' | 'svg' | 'pdf' | 'xlsx';
 
 export function ExportDialog() {
   const project = useProjectStore((state) => state.project);
@@ -22,6 +23,7 @@ export function ExportDialog() {
   const [customWidth, setCustomWidth] = useState(1200);
   const [pdfPages, setPdfPages] = useState<PDFPageCount>(1);
   const [svgCellSize, setSvgCellSize] = useState(20);
+  const [xlsxCellSize, setXlsxCellSize] = useState(3);
   const [includeGridLines, setIncludeGridLines] = useState(true);
   const [includeLegend, setIncludeLegend] = useState(true);
   const [exportSelection, setExportSelection] = useState(false);
@@ -82,6 +84,14 @@ export function ExportDialog() {
             selection: selectionBounds,
           });
           break;
+
+        case 'xlsx':
+          await downloadXLSX(project, {
+            includeColorLegend: includeLegend,
+            cellSize: xlsxCellSize,
+            selection: selectionBounds,
+          });
+          break;
       }
 
       closeDialog();
@@ -105,8 +115,8 @@ export function ExportDialog() {
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Format
           </label>
-          <div className="grid grid-cols-4 gap-2">
-            {(['json', 'png', 'svg', 'pdf'] as ExportFormat[]).map((f) => (
+          <div className="grid grid-cols-5 gap-2">
+            {(['json', 'png', 'svg', 'pdf', 'xlsx'] as ExportFormat[]).map((f) => (
               <button
                 key={f}
                 onClick={() => setFormat(f)}
@@ -201,6 +211,25 @@ export function ExportDialog() {
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               Multi-page exports split the chart across pages for detailed printing.
+            </p>
+          </div>
+        )}
+
+        {format === 'xlsx' && (
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Cell Size (Excel units)
+            </label>
+            <input
+              type="number"
+              value={xlsxCellSize}
+              onChange={(e) => setXlsxCellSize(Number(e.target.value))}
+              min={1}
+              max={20}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Excel export creates a spreadsheet with colored cells. Great for printing or sharing.
             </p>
           </div>
         )}

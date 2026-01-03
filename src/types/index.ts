@@ -118,7 +118,7 @@ export interface AppSettings {
 }
 
 // Tool types for the editor
-export type EditorTool = 'draw' | 'erase' | 'select' | 'pan' | 'eyedropper';
+export type EditorTool = 'draw' | 'erase' | 'select' | 'pan' | 'eyedropper' | 'fill';
 
 // Selection state
 export interface Selection {

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-type DialogType = 'newProject' | 'settings' | 'export' | 'import' | 'chartSettings' | 'writtenInstructions' | null;
+type DialogType = 'newProject' | 'settings' | 'export' | 'import' | 'chartSettings' | 'writtenInstructions' | 'imageImport' | null;
 type PanelType = 'palette' | 'layers' | 'progress';
 
 interface UIState {

@@ -15,6 +15,9 @@ export function useKeyboardShortcuts() {
   const pasteSelection = useProjectStore((state) => state.pasteSelection);
   const fillSelection = useProjectStore((state) => state.fillSelection);
   const selection = useProjectStore((state) => state.selection);
+  const nextProgressRow = useProjectStore((state) => state.nextProgressRow);
+  const prevProgressRow = useProjectStore((state) => state.prevProgressRow);
+  const progressTracker = project?.progressTracker;
   const view = useUIStore((state) => state.view);
 
   useEffect(() => {
@@ -64,6 +67,18 @@ export function useKeyboardShortcuts() {
             if (selection) {
               e.preventDefault();
               fillSelection(null);
+            }
+            break;
+          case 'arrowdown':
+            if (progressTracker) {
+              e.preventDefault();
+              nextProgressRow();
+            }
+            break;
+          case 'arrowup':
+            if (progressTracker) {
+              e.preventDefault();
+              prevProgressRow();
             }
             break;
         }
@@ -148,5 +163,8 @@ export function useKeyboardShortcuts() {
     pasteSelection,
     fillSelection,
     selection,
+    nextProgressRow,
+    prevProgressRow,
+    progressTracker,
   ]);
 }

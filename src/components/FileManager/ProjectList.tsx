@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/services/db';
 import type { Project, ChartType } from '@/types';
 import { useProjectStore } from '@/stores/projectStore';
 import { useUIStore } from '@/stores/uiStore';
 import { deleteProject } from '@/services/db';
+import { getCachedThumbnail } from '@/utils/thumbnail';
 
 const CHART_TYPE_LABELS: Record<ChartType, string> = {
   c2c: 'Corner to Corner (C2C)',
@@ -77,8 +78,29 @@ export function ProjectList() {
         </h2>
         <div className="flex items-center gap-2">
           <button
+            onClick={() => openDialog('imageImport')}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            title="Import from image"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+              />
+            </svg>
+            Image
+          </button>
+          <button
             onClick={() => openDialog('import')}
             className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            title="Import JSON project"
           >
             <svg
               className="w-5 h-5"
@@ -183,21 +205,7 @@ export function ProjectList() {
               className="group bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 cursor-pointer hover:border-blue-500 hover:shadow-md transition-all"
             >
               {/* Preview area */}
-              <div className="aspect-video bg-gray-100 dark:bg-gray-700 rounded-lg mb-3 flex items-center justify-center">
-                <svg
-                  className="w-12 h-12 text-gray-300 dark:text-gray-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1}
-                    d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"
-                  />
-                </svg>
-              </div>
+              <ProjectThumbnail project={project} />
 
               {/* Info */}
               <div className="flex items-start justify-between gap-2">
@@ -246,6 +254,38 @@ export function ProjectList() {
             </div>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+// Thumbnail component for project cards
+function ProjectThumbnail({ project }: { project: Project }) {
+  const thumbnail = useMemo(() => getCachedThumbnail(project), [project]);
+
+  return (
+    <div className="aspect-video bg-gray-100 dark:bg-gray-700 rounded-lg mb-3 flex items-center justify-center overflow-hidden">
+      {thumbnail ? (
+        <img
+          src={thumbnail}
+          alt={project.name}
+          className="w-full h-full object-contain"
+          style={{ imageRendering: 'pixelated' }}
+        />
+      ) : (
+        <svg
+          className="w-12 h-12 text-gray-300 dark:text-gray-600"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1}
+            d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"
+          />
+        </svg>
       )}
     </div>
   );

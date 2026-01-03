@@ -81,6 +81,9 @@ interface ProjectState {
   deleteColumn: (index: number) => void;
   resizeGrid: (width: number, height: number) => void;
 
+  // Flood fill
+  floodFill: (row: number, col: number, colorId: string | null) => void;
+
   // Progress tracker
   initProgressTracker: () => void;
   setProgressRow: (row: number) => void;
@@ -571,6 +574,53 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       project: {
         ...project,
         settings: { ...project.settings, width, height },
+        grid: { cells: newCells },
+        updatedAt: new Date(),
+      },
+      isDirty: true,
+    });
+  },
+
+  floodFill: (startRow, startCol, newColorId) => {
+    const { project } = get();
+    if (!project?.grid) return;
+
+    const { cells } = project.grid;
+    const { width, height } = project.settings;
+
+    // Get the color we're replacing
+    const targetColorId = cells[startRow]?.[startCol]?.colorId ?? null;
+
+    // Don't fill if target is same as new color
+    if (targetColorId === newColorId) return;
+
+    get().pushUndoState();
+
+    // BFS flood fill
+    const newCells = cells.map(row => row.map(cell => ({ ...cell })));
+    const visited = new Set<string>();
+    const queue: [number, number][] = [[startRow, startCol]];
+
+    while (queue.length > 0) {
+      const [row, col] = queue.shift()!;
+      const key = `${row},${col}`;
+
+      if (visited.has(key)) continue;
+      if (row < 0 || row >= height || col < 0 || col >= width) continue;
+
+      const cellColorId = newCells[row][col].colorId ?? null;
+      if (cellColorId !== targetColorId) continue;
+
+      visited.add(key);
+      newCells[row][col] = { ...newCells[row][col], colorId: newColorId };
+
+      // Add neighbors
+      queue.push([row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]);
+    }
+
+    set({
+      project: {
+        ...project,
         grid: { cells: newCells },
         updatedAt: new Date(),
       },
