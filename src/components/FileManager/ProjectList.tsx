@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/services/db';
+import { db, saveProject } from '@/services/db';
 import type { Project, ChartType } from '@/types';
 import { useProjectStore } from '@/stores/projectStore';
 import { useUIStore } from '@/stores/uiStore';
 import { deleteProject } from '@/services/db';
 import { getCachedThumbnail } from '@/utils/thumbnail';
+import { FolderTree } from './FolderTree';
 
 const CHART_TYPE_LABELS: Record<ChartType, string> = {
   c2c: 'Corner to Corner (C2C)',
@@ -27,22 +28,42 @@ const CHART_TYPE_COLORS: Record<ChartType, string> = {
 
 export function ProjectList() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [movingProjectId, setMovingProjectId] = useState<string | null>(null);
   const loadProject = useProjectStore((state) => state.loadProject);
   const setView = useUIStore((state) => state.setView);
   const openDialog = useUIStore((state) => state.openDialog);
   const addToast = useUIStore((state) => state.addToast);
 
-  // Live query for projects
+  // Live query for folders
+  const folders = useLiveQuery(() => db.folders.toArray(), []);
+
+  // Live query for projects - filtered by search and folder
   const projects = useLiveQuery(async () => {
+    let query = db.projects;
+
+    // Get all projects first
+    let results = await query.toArray();
+
+    // Filter by folder (unless searching)
+    if (!searchQuery && selectedFolderId !== null) {
+      results = results.filter((p) => p.folderId === selectedFolderId);
+    } else if (!searchQuery) {
+      // Show root level projects (no folder) when "All Charts" is selected
+      // Actually show all projects when "All Charts" is selected
+    }
+
+    // Filter by search
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
-      return db.projects
-        .filter((p) => p.name.toLowerCase().includes(lowerQuery))
-        .reverse()
-        .sortBy('updatedAt');
+      results = results.filter((p) => p.name.toLowerCase().includes(lowerQuery));
     }
-    return db.projects.reverse().sortBy('updatedAt');
-  }, [searchQuery]);
+
+    // Sort by updated date
+    results.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+    return results;
+  }, [searchQuery, selectedFolderId]);
 
   const handleOpenProject = async (project: Project) => {
     const success = await loadProject(project.id);
@@ -61,6 +82,12 @@ export function ProjectList() {
     }
   };
 
+  const handleMoveProject = async (project: Project, folderId: string | undefined) => {
+    await saveProject({ ...project, folderId });
+    setMovingProjectId(null);
+    addToast(`Moved to ${folderId ? 'folder' : 'All Charts'}`, 'success');
+  };
+
   const formatDate = (date: Date) => {
     return new Date(date).toLocaleDateString(undefined, {
       year: 'numeric',
@@ -69,13 +96,28 @@ export function ProjectList() {
     });
   };
 
+  const currentFolder = folders?.find((f) => f.id === selectedFolderId);
+
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
-          My Charts
-        </h2>
+    <div className="flex h-full">
+      {/* Folder Sidebar */}
+      <div className="w-56 bg-gray-50 dark:bg-gray-850 border-r border-gray-200 dark:border-gray-700 p-3 flex-shrink-0 overflow-auto">
+        <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-2">
+          Folders
+        </h3>
+        <FolderTree
+          selectedFolderId={selectedFolderId}
+          onSelectFolder={setSelectedFolderId}
+        />
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 p-6 overflow-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
+            {currentFolder ? currentFolder.name : 'All Charts'}
+          </h2>
         <div className="flex items-center gap-2">
           <button
             onClick={() => openDialog('imageImport')}
@@ -217,25 +259,64 @@ export function ProjectList() {
                     {project.settings.width} x {project.settings.height}
                   </p>
                 </div>
-                <button
-                  onClick={(e) => handleDeleteProject(project, e)}
-                  className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Delete"
-                >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {/* Move button */}
+                  <div className="relative">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMovingProjectId(movingProjectId === project.id ? null : project.id);
+                      }}
+                      className="p-1 text-gray-400 hover:text-blue-500"
+                      title="Move to folder"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      </svg>
+                    </button>
+                    {/* Move dropdown */}
+                    {movingProjectId === project.id && (
+                      <div
+                        className="absolute right-0 top-full mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 min-w-40 z-50"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          onClick={() => handleMoveProject(project, undefined)}
+                          className={`w-full px-3 py-1.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                            !project.folderId ? 'text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-700 dark:text-gray-200'
+                          }`}
+                        >
+                          All Charts (Root)
+                        </button>
+                        {folders?.map((folder) => (
+                          <button
+                            key={folder.id}
+                            onClick={() => handleMoveProject(project, folder.id)}
+                            className={`w-full px-3 py-1.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                              project.folderId === folder.id ? 'text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-700 dark:text-gray-200'
+                            }`}
+                          >
+                            {folder.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={(e) => handleDeleteProject(project, e)}
+                    className="p-1 text-gray-400 hover:text-red-500"
+                    title="Delete"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    />
-                  </svg>
-                </button>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
               {/* Type badge and date */}
@@ -255,6 +336,7 @@ export function ProjectList() {
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }
