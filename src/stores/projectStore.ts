@@ -8,9 +8,17 @@ import type {
   PaletteEntry,
   EditorTool,
   Selection,
+  ProgressState,
 } from '@/types';
 import { createDefaultProject, DEFAULT_CHART_SETTINGS } from '@/types';
 import { saveProject, getProject } from '@/services/db';
+
+// Clipboard type for copy/paste
+interface Clipboard {
+  cells: Cell[][];
+  width: number;
+  height: number;
+}
 
 interface ProjectState {
   // Current project
@@ -23,6 +31,7 @@ interface ProjectState {
   selection: Selection | null;
   zoom: number;
   panOffset: { x: number; y: number };
+  clipboard: Clipboard | null;
 
   // Undo/Redo
   undoStack: Project[];
@@ -42,6 +51,12 @@ interface ProjectState {
   // Selection
   setSelection: (selection: Selection | null) => void;
   clearSelection: () => void;
+
+  // Clipboard operations
+  copySelection: () => void;
+  pasteSelection: () => void;
+  mirrorSelectionH: () => void;
+  mirrorSelectionV: () => void;
 
   // Palette
   addColor: (color: string, name?: string) => PaletteEntry;
@@ -65,6 +80,14 @@ interface ProjectState {
   insertColumn: (index: number) => void;
   deleteColumn: (index: number) => void;
   resizeGrid: (width: number, height: number) => void;
+
+  // Progress tracker
+  initProgressTracker: () => void;
+  setProgressRow: (row: number) => void;
+  nextProgressRow: () => void;
+  prevProgressRow: () => void;
+  updateProgressSettings: (settings: Partial<ProgressState>) => void;
+  clearProgressTracker: () => void;
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
@@ -75,6 +98,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   selection: null,
   zoom: 1,
   panOffset: { x: 0, y: 0 },
+  clipboard: null,
   undoStack: [],
   redoStack: [],
 
@@ -214,6 +238,121 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   setSelection: (selection) => set({ selection }),
   clearSelection: () => set({ selection: null }),
+
+  copySelection: () => {
+    const { project, selection } = get();
+    if (!project?.grid || !selection) return;
+
+    const minRow = Math.min(selection.startRow, selection.endRow);
+    const maxRow = Math.max(selection.startRow, selection.endRow);
+    const minCol = Math.min(selection.startCol, selection.endCol);
+    const maxCol = Math.max(selection.startCol, selection.endCol);
+
+    const width = maxCol - minCol + 1;
+    const height = maxRow - minRow + 1;
+    const cells: Cell[][] = [];
+
+    for (let row = 0; row < height; row++) {
+      cells[row] = [];
+      for (let col = 0; col < width; col++) {
+        const sourceCell = project.grid.cells[minRow + row]?.[minCol + col];
+        cells[row][col] = sourceCell ? { ...sourceCell } : { colorId: null, symbolId: null };
+      }
+    }
+
+    set({ clipboard: { cells, width, height } });
+  },
+
+  pasteSelection: () => {
+    const { project, selection, clipboard } = get();
+    if (!project?.grid || !selection || !clipboard) return;
+
+    get().pushUndoState();
+
+    const minRow = Math.min(selection.startRow, selection.endRow);
+    const minCol = Math.min(selection.startCol, selection.endCol);
+
+    const newCells = project.grid.cells.map(row => row.map(cell => ({ ...cell })));
+
+    for (let row = 0; row < clipboard.height; row++) {
+      for (let col = 0; col < clipboard.width; col++) {
+        const targetRow = minRow + row;
+        const targetCol = minCol + col;
+        if (targetRow < project.settings.height && targetCol < project.settings.width) {
+          newCells[targetRow][targetCol] = { ...clipboard.cells[row][col] };
+        }
+      }
+    }
+
+    set({
+      project: {
+        ...project,
+        grid: { cells: newCells },
+        updatedAt: new Date(),
+      },
+      isDirty: true,
+    });
+  },
+
+  mirrorSelectionH: () => {
+    const { project, selection } = get();
+    if (!project?.grid || !selection) return;
+
+    get().pushUndoState();
+
+    const minRow = Math.min(selection.startRow, selection.endRow);
+    const maxRow = Math.max(selection.startRow, selection.endRow);
+    const minCol = Math.min(selection.startCol, selection.endCol);
+    const maxCol = Math.max(selection.startCol, selection.endCol);
+
+    const newCells = project.grid.cells.map(row => row.map(cell => ({ ...cell })));
+
+    for (let row = minRow; row <= maxRow; row++) {
+      for (let col = minCol; col <= maxCol; col++) {
+        const mirrorCol = maxCol - (col - minCol);
+        newCells[row][col] = { ...project.grid.cells[row][mirrorCol] };
+      }
+    }
+
+    set({
+      project: {
+        ...project,
+        grid: { cells: newCells },
+        updatedAt: new Date(),
+      },
+      isDirty: true,
+    });
+  },
+
+  mirrorSelectionV: () => {
+    const { project, selection } = get();
+    if (!project?.grid || !selection) return;
+
+    get().pushUndoState();
+
+    const minRow = Math.min(selection.startRow, selection.endRow);
+    const maxRow = Math.max(selection.startRow, selection.endRow);
+    const minCol = Math.min(selection.startCol, selection.endCol);
+    const maxCol = Math.max(selection.startCol, selection.endCol);
+
+    const newCells = project.grid.cells.map(row => row.map(cell => ({ ...cell })));
+
+    for (let row = minRow; row <= maxRow; row++) {
+      for (let col = minCol; col <= maxCol; col++) {
+        const mirrorRow = maxRow - (row - minRow);
+        newCells[row][col] = { ...project.grid.cells[mirrorRow][col] };
+      }
+    }
+
+    set({
+      project: {
+        ...project,
+        grid: { cells: newCells },
+        updatedAt: new Date(),
+      },
+      isDirty: true,
+    });
+  },
 
   addColor: (color, name) => {
     const { project } = get();
@@ -433,6 +572,84 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         ...project,
         settings: { ...project.settings, width, height },
         grid: { cells: newCells },
+        updatedAt: new Date(),
+      },
+      isDirty: true,
+    });
+  },
+
+  initProgressTracker: () => {
+    const { project } = get();
+    if (!project) return;
+
+    const defaultProgress: ProgressState = {
+      direction: 'horizontal',
+      currentRow: 0,
+      darkenMode: 'done',
+      brightness: 50,
+    };
+
+    set({
+      project: {
+        ...project,
+        progressTracker: defaultProgress,
+        updatedAt: new Date(),
+      },
+      isDirty: true,
+    });
+  },
+
+  setProgressRow: (row) => {
+    const { project } = get();
+    if (!project?.progressTracker) return;
+
+    const maxRow = project.settings.height - 1;
+    const clampedRow = Math.max(0, Math.min(maxRow, row));
+
+    set({
+      project: {
+        ...project,
+        progressTracker: { ...project.progressTracker, currentRow: clampedRow },
+        updatedAt: new Date(),
+      },
+      isDirty: true,
+    });
+  },
+
+  nextProgressRow: () => {
+    const { project, setProgressRow } = get();
+    if (!project?.progressTracker) return;
+    setProgressRow(project.progressTracker.currentRow + 1);
+  },
+
+  prevProgressRow: () => {
+    const { project, setProgressRow } = get();
+    if (!project?.progressTracker) return;
+    setProgressRow(project.progressTracker.currentRow - 1);
+  },
+
+  updateProgressSettings: (settings) => {
+    const { project } = get();
+    if (!project?.progressTracker) return;
+
+    set({
+      project: {
+        ...project,
+        progressTracker: { ...project.progressTracker, ...settings },
+        updatedAt: new Date(),
+      },
+      isDirty: true,
+    });
+  },
+
+  clearProgressTracker: () => {
+    const { project } = get();
+    if (!project) return;
+
+    set({
+      project: {
+        ...project,
+        progressTracker: undefined,
         updatedAt: new Date(),
       },
       isDirty: true,

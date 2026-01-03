@@ -11,6 +11,10 @@ export function useKeyboardShortcuts() {
   const setZoom = useProjectStore((state) => state.setZoom);
   const zoom = useProjectStore((state) => state.zoom);
   const clearSelection = useProjectStore((state) => state.clearSelection);
+  const copySelection = useProjectStore((state) => state.copySelection);
+  const pasteSelection = useProjectStore((state) => state.pasteSelection);
+  const fillSelection = useProjectStore((state) => state.fillSelection);
+  const selection = useProjectStore((state) => state.selection);
   const view = useUIStore((state) => state.view);
 
   useEffect(() => {
@@ -55,6 +59,13 @@ export function useKeyboardShortcuts() {
             e.preventDefault();
             clearSelection();
             break;
+          case 'delete':
+          case 'backspace':
+            if (selection) {
+              e.preventDefault();
+              fillSelection(null);
+            }
+            break;
         }
       }
 
@@ -90,6 +101,18 @@ export function useKeyboardShortcuts() {
             e.preventDefault();
             setZoom(1);
             break;
+          case 'c':
+            if (selection) {
+              e.preventDefault();
+              copySelection();
+            }
+            break;
+          case 'v':
+            if (selection) {
+              e.preventDefault();
+              pasteSelection();
+            }
+            break;
         }
       }
     };
@@ -121,5 +144,9 @@ export function useKeyboardShortcuts() {
     setZoom,
     zoom,
     clearSelection,
+    copySelection,
+    pasteSelection,
+    fillSelection,
+    selection,
   ]);
 }

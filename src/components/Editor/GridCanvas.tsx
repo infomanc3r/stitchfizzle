@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { Canvas, Rect, Line } from 'fabric';
 import { useProjectStore } from '@/stores/projectStore';
 
@@ -16,10 +16,15 @@ export function GridCanvas() {
   const activeTool = useProjectStore((state) => state.activeTool);
   const activeColorId = useProjectStore((state) => state.activeColorId);
   const setCell = useProjectStore((state) => state.setCell);
+  const selection = useProjectStore((state) => state.selection);
+  const setSelection = useProjectStore((state) => state.setSelection);
+
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   const isDrawingRef = useRef(false);
   const lastCellRef = useRef<{ row: number; col: number } | null>(null);
   const drawnCellsRef = useRef<Set<string>>(new Set());
+  const selectionStartRef = useRef<{ row: number; col: number } | null>(null);
 
   // Initialize canvas
   useEffect(() => {
@@ -51,7 +56,7 @@ export function GridCanvas() {
     };
   }, []);
 
-  // Render grid when project/zoom/pan changes
+  // Render grid when project/zoom/pan/selection changes
   const renderGrid = useCallback(() => {
     const canvas = fabricRef.current;
     if (!canvas || !project?.grid || !project.settings) return;
@@ -139,8 +144,80 @@ export function GridCanvas() {
       }
     }
 
+    // Draw progress overlay
+    const progressTracker = project.progressTracker;
+    if (progressTracker && progressTracker.darkenMode !== 'none') {
+      const { currentRow, darkenMode, brightness } = progressTracker;
+      const opacity = (100 - brightness) / 100;
+
+      for (let row = startRow; row < endRow; row++) {
+        let shouldDarken = false;
+
+        switch (darkenMode) {
+          case 'done':
+            shouldDarken = row < currentRow;
+            break;
+          case 'todo':
+            shouldDarken = row > currentRow;
+            break;
+          case 'except-current':
+            shouldDarken = row !== currentRow;
+            break;
+        }
+
+        if (shouldDarken) {
+          const overlay = new Rect({
+            left: offsetX + startCol * scaledCellSize,
+            top: offsetY + row * scaledCellSize,
+            width: (endCol - startCol) * scaledCellSize,
+            height: scaledCellSize,
+            fill: `rgba(0, 0, 0, ${opacity})`,
+            selectable: false,
+            evented: false,
+          });
+          canvas.add(overlay);
+        }
+      }
+
+      // Highlight current row
+      const currentRowRect = new Rect({
+        left: offsetX,
+        top: offsetY + currentRow * scaledCellSize,
+        width: width * scaledCellSize,
+        height: scaledCellSize,
+        fill: 'transparent',
+        stroke: '#22C55E',
+        strokeWidth: 3,
+        selectable: false,
+        evented: false,
+      });
+      canvas.add(currentRowRect);
+    }
+
+    // Draw selection overlay
+    if (selection) {
+      const minRow = Math.min(selection.startRow, selection.endRow);
+      const maxRow = Math.max(selection.startRow, selection.endRow);
+      const minCol = Math.min(selection.startCol, selection.endCol);
+      const maxCol = Math.max(selection.startCol, selection.endCol);
+
+      const selectionRect = new Rect({
+        left: offsetX + minCol * scaledCellSize,
+        top: offsetY + minRow * scaledCellSize,
+        width: (maxCol - minCol + 1) * scaledCellSize,
+        height: (maxRow - minRow + 1) * scaledCellSize,
+        fill: 'rgba(59, 130, 246, 0.2)',
+        stroke: '#3B82F6',
+        strokeWidth: 2,
+        strokeDashArray: [5, 5],
+        selectable: false,
+        evented: false,
+      });
+      canvas.add(selectionRect);
+    }
+
     canvas.renderAll();
-  }, [project, zoom, panOffset]);
+  }, [project, zoom, panOffset, selection]);
 
   // Re-render when dependencies change
   useEffect(() => {
@@ -171,9 +248,21 @@ export function GridCanvas() {
   // Mouse handlers
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
+      // Close context menu on any click
+      setContextMenu(null);
+
       if (activeTool === 'pan') {
         isDrawingRef.current = true;
-        lastCellRef.current = { row: e.clientY, col: e.clientX }; // Store mouse position for pan
+        lastCellRef.current = { row: e.clientY, col: e.clientX };
+        return;
+      }
+
+      if (activeTool === 'select') {
+        const cell = getCellFromEvent(e);
+        if (!cell) return;
+        isDrawingRef.current = true;
+        selectionStartRef.current = cell;
+        setSelection({ startRow: cell.row, startCol: cell.col, endRow: cell.row, endCol: cell.col });
         return;
       }
 
@@ -190,7 +279,7 @@ export function GridCanvas() {
       setCell(cell.row, cell.col, colorToSet);
       drawnCellsRef.current.add(`${cell.row},${cell.col}`);
     },
-    [activeTool, activeColorId, getCellFromEvent, setCell]
+    [activeTool, activeColorId, getCellFromEvent, setCell, setSelection]
   );
 
   const handleMouseMove = useCallback(
@@ -202,6 +291,18 @@ export function GridCanvas() {
         const dy = e.clientY - lastCellRef.current.row;
         setPanOffset({ x: panOffset.x + dx, y: panOffset.y + dy });
         lastCellRef.current = { row: e.clientY, col: e.clientX };
+        return;
+      }
+
+      if (activeTool === 'select' && selectionStartRef.current) {
+        const cell = getCellFromEvent(e);
+        if (!cell) return;
+        setSelection({
+          startRow: selectionStartRef.current.row,
+          startCol: selectionStartRef.current.col,
+          endRow: cell.row,
+          endCol: cell.col,
+        });
         return;
       }
 
@@ -218,14 +319,26 @@ export function GridCanvas() {
       drawnCellsRef.current.add(cellKey);
       lastCellRef.current = cell;
     },
-    [activeTool, activeColorId, getCellFromEvent, setCell, panOffset, setPanOffset]
+    [activeTool, activeColorId, getCellFromEvent, setCell, panOffset, setPanOffset, setSelection]
   );
 
   const handleMouseUp = useCallback(() => {
     isDrawingRef.current = false;
     lastCellRef.current = null;
     drawnCellsRef.current.clear();
+    selectionStartRef.current = null;
   }, []);
+
+  // Context menu handler
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      if (selection) {
+        setContextMenu({ x: e.clientX, y: e.clientY });
+      }
+    },
+    [selection]
+  );
 
   // Wheel handler for zoom
   const handleWheel = useCallback(
@@ -264,7 +377,7 @@ export function GridCanvas() {
       case 'erase':
         return 'crosshair';
       case 'select':
-        return 'cell';
+        return 'crosshair';
       case 'pan':
         return 'grab';
       case 'eyedropper':
@@ -277,7 +390,7 @@ export function GridCanvas() {
   return (
     <div
       ref={containerRef}
-      className="w-full h-full overflow-hidden bg-gray-100 dark:bg-gray-900"
+      className="w-full h-full overflow-hidden bg-gray-100 dark:bg-gray-900 relative"
       style={{ cursor: getCursor() }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -285,8 +398,141 @@ export function GridCanvas() {
       onMouseLeave={handleMouseUp}
       onWheel={handleWheel}
       onClick={handleClick}
+      onContextMenu={handleContextMenu}
     >
       <canvas ref={canvasRef} />
+
+      {/* Context Menu */}
+      {contextMenu && selection && (
+        <SelectionContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+interface SelectionContextMenuProps {
+  x: number;
+  y: number;
+  onClose: () => void;
+}
+
+function SelectionContextMenu({ x, y, onClose }: SelectionContextMenuProps) {
+  const copySelection = useProjectStore((state) => state.copySelection);
+  const pasteSelection = useProjectStore((state) => state.pasteSelection);
+  const fillSelection = useProjectStore((state) => state.fillSelection);
+  const mirrorSelectionH = useProjectStore((state) => state.mirrorSelectionH);
+  const mirrorSelectionV = useProjectStore((state) => state.mirrorSelectionV);
+  const clearSelection = useProjectStore((state) => state.clearSelection);
+  const activeColorId = useProjectStore((state) => state.activeColorId);
+  const clipboard = useProjectStore((state) => state.clipboard);
+
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [onClose]);
+
+  const handleCopy = () => {
+    copySelection();
+    onClose();
+  };
+
+  const handlePaste = () => {
+    pasteSelection();
+    onClose();
+  };
+
+  const handleFill = () => {
+    fillSelection(activeColorId);
+    onClose();
+  };
+
+  const handleClear = () => {
+    fillSelection(null);
+    onClose();
+  };
+
+  const handleMirrorH = () => {
+    mirrorSelectionH();
+    onClose();
+  };
+
+  const handleMirrorV = () => {
+    mirrorSelectionV();
+    onClose();
+  };
+
+  const handleDeselect = () => {
+    clearSelection();
+    onClose();
+  };
+
+  return (
+    <div
+      ref={menuRef}
+      className="fixed bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-50 min-w-40"
+      style={{ left: x, top: y }}
+    >
+      <button
+        onClick={handleCopy}
+        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+      >
+        <span className="w-4">📋</span> Copy
+        <span className="ml-auto text-xs text-gray-400">Ctrl+C</span>
+      </button>
+      <button
+        onClick={handlePaste}
+        disabled={!clipboard}
+        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <span className="w-4">📄</span> Paste
+        <span className="ml-auto text-xs text-gray-400">Ctrl+V</span>
+      </button>
+      <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
+      <button
+        onClick={handleFill}
+        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+      >
+        <span className="w-4">🎨</span> Fill with Color
+      </button>
+      <button
+        onClick={handleClear}
+        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+      >
+        <span className="w-4">🗑️</span> Clear
+        <span className="ml-auto text-xs text-gray-400">Del</span>
+      </button>
+      <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
+      <button
+        onClick={handleMirrorH}
+        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+      >
+        <span className="w-4">↔️</span> Mirror Horizontal
+      </button>
+      <button
+        onClick={handleMirrorV}
+        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+      >
+        <span className="w-4">↕️</span> Mirror Vertical
+      </button>
+      <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
+      <button
+        onClick={handleDeselect}
+        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+      >
+        <span className="w-4">✖️</span> Deselect
+        <span className="ml-auto text-xs text-gray-400">Esc</span>
+      </button>
     </div>
   );
 }

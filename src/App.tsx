@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
 import { MainLayout } from '@/components/Layout';
 import { ProjectList, NewProjectDialog } from '@/components/FileManager';
-import { GridCanvas } from '@/components/Editor';
+import { GridCanvas, Toolbar } from '@/components/Editor';
 import { PalettePanel } from '@/components/Palette';
+import { ExportDialog, ImportDialog, WrittenInstructionsDialog } from '@/components/Export';
+import { ProgressPanel } from '@/components/Progress';
 import { useUIStore } from '@/stores/uiStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useProjectStore } from '@/stores/projectStore';
@@ -29,6 +31,9 @@ function App() {
 
       {/* Dialogs */}
       {activeDialog === 'newProject' && <NewProjectDialog />}
+      {activeDialog === 'export' && <ExportDialog />}
+      {activeDialog === 'import' && <ImportDialog />}
+      {activeDialog === 'writtenInstructions' && <WrittenInstructionsDialog />}
     </MainLayout>
   );
 }
@@ -36,48 +41,23 @@ function App() {
 // Editor view with grid canvas and palette
 function EditorView() {
   const project = useProjectStore((state) => state.project);
-  const zoom = useProjectStore((state) => state.zoom);
-  const setZoom = useProjectStore((state) => state.setZoom);
 
   if (!project) return null;
 
   return (
     <div className="flex h-full">
       {/* Color palette sidebar */}
-      <PalettePanel />
+      <div className="flex flex-col w-64 border-r border-gray-200 dark:border-gray-700">
+        <div className="flex-1 overflow-hidden">
+          <PalettePanel />
+        </div>
+        <ProgressPanel />
+      </div>
 
       {/* Canvas area */}
       <div className="flex-1 flex flex-col">
-        {/* Canvas toolbar */}
-        <div className="h-12 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center px-4 gap-4">
-          <span className="text-sm text-gray-600 dark:text-gray-400">
-            {project.settings.width} x {project.settings.height}
-          </span>
-          <div className="flex-1" />
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setZoom(zoom - 0.1)}
-              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-              disabled={zoom <= 0.1}
-            >
-              <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-              </svg>
-            </button>
-            <span className="text-sm text-gray-600 dark:text-gray-400 w-16 text-center">
-              {Math.round(zoom * 100)}%
-            </span>
-            <button
-              onClick={() => setZoom(zoom + 0.1)}
-              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-              disabled={zoom >= 10}
-            >
-              <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-            </button>
-          </div>
-        </div>
+        {/* Toolbar */}
+        <Toolbar />
 
         {/* Canvas */}
         <div className="flex-1">
