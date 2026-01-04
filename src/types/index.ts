@@ -158,7 +158,7 @@ export const DEFAULT_CHART_SETTINGS: ChartSettings = {
 };
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
-  darkMode: false,
+  darkMode: true,
   units: 'metric',
   handedness: 'right',
   defaultGridWidth: 50,

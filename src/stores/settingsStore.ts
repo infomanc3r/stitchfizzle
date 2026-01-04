@@ -33,6 +33,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       }
     } else {
       set({ loaded: true });
+      // Apply default dark mode on first visit
+      document.documentElement.classList.add('dark');
     }
   },
 
@@ -55,7 +57,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   resetSettings: async () => {
     set({ settings: DEFAULT_APP_SETTINGS });
     await saveAppSettings(DEFAULT_APP_SETTINGS);
-    document.documentElement.classList.remove('dark');
+    document.documentElement.classList.add('dark');
   },
 
   isDarkMode: () => get().settings.darkMode,

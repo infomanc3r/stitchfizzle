@@ -101,7 +101,7 @@ export function ProjectList() {
   return (
     <div className="flex h-full">
       {/* Folder Sidebar */}
-      <div className="w-56 bg-gray-50 dark:bg-gray-850 border-r border-gray-200 dark:border-gray-700 p-3 flex-shrink-0 overflow-auto">
+      <div className="w-56 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 p-3 flex-shrink-0 overflow-auto">
         <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-2">
           Folders
         </h3>

@@ -33,7 +33,7 @@ interface UIState {
 export const useUIStore = create<UIState>((set, get) => ({
   activeDialog: null,
   visiblePanels: new Set(['palette']),
-  sidebarOpen: true,
+  sidebarOpen: false,
   view: 'projects',
   toasts: [],
 
