@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useProjectStore } from '@/stores/projectStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -14,16 +15,36 @@ export function Header() {
   const toggleDarkMode = useSettingsStore((state) => state.toggleDarkMode);
   const isDarkMode = useSettingsStore((state) => state.isDarkMode);
 
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+
   const handleSave = async () => {
     await saveCurrentProject();
   };
 
   const handleBack = () => {
+    if (isDirty) {
+      setShowUnsavedModal(true);
+    } else {
+      closeProject();
+      setView('projects');
+    }
+  };
+
+  const handleDiscardChanges = () => {
+    setShowUnsavedModal(false);
+    closeProject();
+    setView('projects');
+  };
+
+  const handleSaveAndClose = async () => {
+    await saveCurrentProject();
+    setShowUnsavedModal(false);
     closeProject();
     setView('projects');
   };
 
   return (
+    <>
     <header className="h-14 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 shrink-0">
       <div className="flex items-center gap-4">
         {/* Menu button */}
@@ -155,6 +176,44 @@ export function Header() {
           </svg>
         </button>
       </div>
+
     </header>
+
+      {/* Unsaved Changes Modal */}
+      {showUnsavedModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md mx-4">
+            <div className="p-6">
+              <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
+                Unsaved Changes
+              </h2>
+              <p className="text-gray-600 dark:text-gray-300">
+                You have unsaved changes. Would you like to save before leaving?
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => setShowUnsavedModal(false)}
+                className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDiscardChanges}
+                className="px-4 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+              >
+                Don't Save
+              </button>
+              <button
+                onClick={handleSaveAndClose}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
