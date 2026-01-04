@@ -134,6 +134,7 @@ export function NewProjectDialog() {
         highlight5Color: '#999999',
         highlight10Color: '#666666',
       },
+      showNumbers: true,
     });
 
     closeDialog();

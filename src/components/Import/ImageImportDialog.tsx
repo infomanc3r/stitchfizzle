@@ -98,6 +98,7 @@ export function ImageImportDialog() {
             highlight5Color: '#999999',
             highlight10Color: '#666666',
           },
+          showNumbers: true,
         },
         grid: { cells: result.cells },
         palette: result.palette,
