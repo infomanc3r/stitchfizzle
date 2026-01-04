@@ -1,9 +1,11 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { Canvas, Path, Rect, Circle } from 'fabric';
 import { useProjectStore } from '@/stores/projectStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { getSymbol } from '@/symbols/crochet';
 
 const SYMBOL_SIZE = 40; // Base symbol size in pixels
+const GRID_CELL_SIZE = 50; // Size of each grid cell in pixels
 
 export function FreeformCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -23,6 +25,8 @@ export function FreeformCanvas() {
   const removePlacedSymbol = useProjectStore((state) => state.removePlacedSymbol);
   const rotatePlacedSymbol = useProjectStore((state) => state.rotatePlacedSymbol);
   const scalePlacedSymbol = useProjectStore((state) => state.scalePlacedSymbol);
+
+  const isDarkMode = useSettingsStore((state) => state.isDarkMode);
 
   const [isPanning, setIsPanning] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -67,14 +71,38 @@ export function FreeformCanvas() {
     const { layers } = project.freeform;
     const scaledSize = SYMBOL_SIZE * zoom;
 
-    // Draw background grid (light guidelines)
-    const canvasWidth = canvas.width || 800;
-    const canvasHeight = canvas.height || 600;
-    const gridSize = 50 * zoom;
+    // Calculate grid boundaries based on project settings
+    const gridWidth = project.settings.width * GRID_CELL_SIZE;
+    const gridHeight = project.settings.height * GRID_CELL_SIZE;
+    const gridSize = GRID_CELL_SIZE * zoom;
 
-    for (let x = (panOffset.x % gridSize); x < canvasWidth; x += gridSize) {
-      const line = new Path(`M ${x} 0 L ${x} ${canvasHeight}`, {
-        stroke: '#e5e7eb',
+    // Grid origin in canvas coordinates
+    const gridOriginX = panOffset.x;
+    const gridOriginY = panOffset.y;
+    const gridEndX = gridOriginX + gridWidth * zoom;
+    const gridEndY = gridOriginY + gridHeight * zoom;
+
+    // Draw boundary rectangle (the working area)
+    const dark = isDarkMode();
+    const boundaryRect = new Rect({
+      left: gridOriginX,
+      top: gridOriginY,
+      width: gridWidth * zoom,
+      height: gridHeight * zoom,
+      fill: dark ? '#1f2937' : '#ffffff',
+      stroke: '#3B82F6',
+      strokeWidth: 2,
+      selectable: false,
+      evented: false,
+    });
+    canvas.add(boundaryRect);
+
+    // Draw grid lines only within the boundary
+    const gridLineColor = dark ? '#374151' : '#e5e7eb';
+    for (let i = 1; i < project.settings.width; i++) {
+      const x = gridOriginX + i * gridSize;
+      const line = new Path(`M ${x} ${gridOriginY} L ${x} ${gridEndY}`, {
+        stroke: gridLineColor,
         strokeWidth: 1,
         selectable: false,
         evented: false,
@@ -82,9 +110,10 @@ export function FreeformCanvas() {
       canvas.add(line);
     }
 
-    for (let y = (panOffset.y % gridSize); y < canvasHeight; y += gridSize) {
-      const line = new Path(`M 0 ${y} L ${canvasWidth} ${y}`, {
-        stroke: '#e5e7eb',
+    for (let i = 1; i < project.settings.height; i++) {
+      const y = gridOriginY + i * gridSize;
+      const line = new Path(`M ${gridOriginX} ${y} L ${gridEndX} ${y}`, {
+        stroke: gridLineColor,
         strokeWidth: 1,
         selectable: false,
         evented: false,
@@ -173,7 +202,7 @@ export function FreeformCanvas() {
     });
 
     canvas.renderAll();
-  }, [project, zoom, panOffset, selectedSymbolInstanceId]);
+  }, [project, zoom, panOffset, selectedSymbolInstanceId, isDarkMode]);
 
   // Re-render when dependencies change
   useEffect(() => {
@@ -196,6 +225,20 @@ export function FreeformCanvas() {
       return { x: worldX, y: worldY };
     },
     [zoom, panOffset]
+  );
+
+  // Clamp position to grid boundaries
+  const clampToGrid = useCallback(
+    (pos: { x: number; y: number }): { x: number; y: number } => {
+      if (!project) return pos;
+      const maxX = project.settings.width * GRID_CELL_SIZE;
+      const maxY = project.settings.height * GRID_CELL_SIZE;
+      return {
+        x: Math.max(0, Math.min(maxX, pos.x)),
+        y: Math.max(0, Math.min(maxY, pos.y)),
+      };
+    },
+    [project]
   );
 
   // Find symbol at position
@@ -253,7 +296,13 @@ export function FreeformCanvas() {
       }
 
       if (activeTool === 'draw' && activeSymbolId) {
-        addPlacedSymbol(activeSymbolId, pos.x, pos.y);
+        const clampedPos = clampToGrid(pos);
+        // Only place if within grid bounds
+        if (pos.x >= 0 && pos.y >= 0 && project &&
+            pos.x <= project.settings.width * GRID_CELL_SIZE &&
+            pos.y <= project.settings.height * GRID_CELL_SIZE) {
+          addPlacedSymbol(activeSymbolId, clampedPos.x, clampedPos.y);
+        }
         return;
       }
 
@@ -268,11 +317,13 @@ export function FreeformCanvas() {
     [
       activeTool,
       activeSymbolId,
+      project,
       getPositionFromEvent,
       findSymbolAtPosition,
       setSelectedSymbolInstance,
       addPlacedSymbol,
       removePlacedSymbol,
+      clampToGrid,
     ]
   );
 
@@ -288,8 +339,9 @@ export function FreeformCanvas() {
 
       if (isDragging && selectedSymbolInstanceId && lastPosRef.current) {
         const pos = getPositionFromEvent(e);
-        movePlacedSymbol(selectedSymbolInstanceId, pos.x, pos.y);
-        lastPosRef.current = pos;
+        const clampedPos = clampToGrid(pos);
+        movePlacedSymbol(selectedSymbolInstanceId, clampedPos.x, clampedPos.y);
+        lastPosRef.current = clampedPos;
         return;
       }
     },
@@ -301,6 +353,7 @@ export function FreeformCanvas() {
       setPanOffset,
       getPositionFromEvent,
       movePlacedSymbol,
+      clampToGrid,
     ]
   );
 
