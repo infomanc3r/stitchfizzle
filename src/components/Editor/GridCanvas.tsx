@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { Canvas, Rect, Line, Path, type FabricObject } from 'fabric';
+import { Canvas, Rect, Line, Path, FabricText, type FabricObject } from 'fabric';
 import { useProjectStore } from '@/stores/projectStore';
 import type { ChartType } from '@/types';
 
@@ -289,6 +289,83 @@ export function GridCanvas() {
           evented: false,
         });
         canvas.add(line);
+      }
+    }
+
+    // Draw row/column numbers if enabled
+    if (project.settings.showNumbers) {
+      const fontSize = Math.max(8, Math.min(14, scaledCellSize * 0.5));
+      const numberPadding = 4;
+      const textColor = '#666666';
+
+      // Row numbers (on left and right sides)
+      // Crochet style: row 1 is at the bottom, row N is at the top
+      for (let row = startRow; row < endRow; row++) {
+        const displayRowNum = height - row; // Convert to crochet numbering
+        const y = offsetY + row * scaledCellSize + scaledCellSize / 2;
+
+        // Left side number
+        const leftText = new FabricText(String(displayRowNum), {
+          left: offsetX - numberPadding,
+          top: y,
+          fontSize,
+          fill: textColor,
+          fontFamily: 'monospace',
+          originX: 'right',
+          originY: 'center',
+          selectable: false,
+          evented: false,
+        });
+        canvas.add(leftText);
+
+        // Right side number
+        const rightText = new FabricText(String(displayRowNum), {
+          left: offsetX + width * scaledCellSize + numberPadding,
+          top: y,
+          fontSize,
+          fill: textColor,
+          fontFamily: 'monospace',
+          originX: 'left',
+          originY: 'center',
+          selectable: false,
+          evented: false,
+        });
+        canvas.add(rightText);
+      }
+
+      // Column numbers (on top and bottom sides)
+      // Crochet style: column 1 is on the right, column N is on the left
+      for (let col = startCol; col < endCol; col++) {
+        const displayColNum = width - col; // Reversed: 1 on right, N on left
+        const x = offsetX + col * scaledCellSize + scaledCellSize / 2;
+
+        // Top number
+        const topText = new FabricText(String(displayColNum), {
+          left: x,
+          top: offsetY - numberPadding,
+          fontSize,
+          fill: textColor,
+          fontFamily: 'monospace',
+          originX: 'center',
+          originY: 'bottom',
+          selectable: false,
+          evented: false,
+        });
+        canvas.add(topText);
+
+        // Bottom number
+        const bottomText = new FabricText(String(displayColNum), {
+          left: x,
+          top: offsetY + height * scaledCellSize + numberPadding,
+          fontSize,
+          fill: textColor,
+          fontFamily: 'monospace',
+          originX: 'center',
+          originY: 'top',
+          selectable: false,
+          evented: false,
+        });
+        canvas.add(bottomText);
       }
     }
 

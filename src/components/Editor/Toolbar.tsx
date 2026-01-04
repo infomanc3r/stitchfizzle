@@ -19,6 +19,7 @@ export function Toolbar() {
   const insertColumn = useProjectStore((state) => state.insertColumn);
   const deleteColumn = useProjectStore((state) => state.deleteColumn);
   const resizeGrid = useProjectStore((state) => state.resizeGrid);
+  const toggleShowNumbers = useProjectStore((state) => state.toggleShowNumbers);
   const openDialog = useUIStore((state) => state.openDialog);
 
   const [showGridDialog, setShowGridDialog] = useState(false);
@@ -215,7 +216,7 @@ export function Toolbar() {
         </div>
       )}
 
-      {/* Grid size */}
+      {/* Grid size & options */}
       <div className="flex items-center gap-1 pr-2 border-r border-gray-200 dark:border-gray-600 flex-shrink-0">
         <button
           onClick={() => setShowGridDialog(true)}
@@ -223,6 +224,17 @@ export function Toolbar() {
           className="px-3 h-9 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg flex items-center gap-1"
         >
           <span>Grid: {project?.settings.width} x {project?.settings.height}</span>
+        </button>
+        <button
+          onClick={toggleShowNumbers}
+          title="Toggle row/column numbers"
+          className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors ${
+            project?.settings.showNumbers
+              ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300'
+              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+          }`}
+        >
+          <span className="text-sm font-mono">#</span>
         </button>
       </div>
 

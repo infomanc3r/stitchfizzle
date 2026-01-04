@@ -19,6 +19,7 @@ export interface ChartSettings {
   gaugeH: number;
   gaugeV: number;
   gridLines: GridLineSettings;
+  showNumbers: boolean;
 }
 
 // Cell in grid-based charts
@@ -155,6 +156,7 @@ export const DEFAULT_CHART_SETTINGS: ChartSettings = {
   gaugeH: 1,
   gaugeV: 1,
   gridLines: DEFAULT_GRID_LINE_SETTINGS,
+  showNumbers: true,
 };
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {

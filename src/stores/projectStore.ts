@@ -84,6 +84,7 @@ interface ProjectState {
   insertColumn: (index: number) => void;
   deleteColumn: (index: number) => void;
   resizeGrid: (width: number, height: number) => void;
+  toggleShowNumbers: () => void;
 
   // Flood fill
   floodFill: (row: number, col: number, colorId: string | null) => void;
@@ -163,6 +164,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   loadProject: async (id) => {
     const project = await getProject(id);
     if (project) {
+      // Ensure backward compatibility for showNumbers setting
+      if (project.settings.showNumbers === undefined) {
+        project.settings.showNumbers = true;
+      }
       set({
         project,
         isDirty: false,
@@ -600,6 +605,23 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         ...project,
         settings: { ...project.settings, width, height },
         grid: { cells: newCells },
+        updatedAt: new Date(),
+      },
+      isDirty: true,
+    });
+  },
+
+  toggleShowNumbers: () => {
+    const { project } = get();
+    if (!project) return;
+
+    set({
+      project: {
+        ...project,
+        settings: {
+          ...project.settings,
+          showNumbers: !project.settings.showNumbers,
+        },
         updatedAt: new Date(),
       },
       isDirty: true,
