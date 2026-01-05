@@ -31,8 +31,13 @@ export function exportProjectToSVG(project: Project, options: SVGExportOptions):
   const exportHeight = endRow - startRow + 1;
 
   const legendWidth = includeLegend ? 150 : 0;
-  const svgWidth = exportWidth * cellSize + legendWidth;
-  const svgHeight = exportHeight * cellSize;
+  const showNumbers = settings.showNumbers ?? false;
+  const numberMargin = showNumbers ? 30 : 0;
+  const gridOffsetX = numberMargin;
+  const gridOffsetY = numberMargin;
+  const svgWidth = exportWidth * cellSize + legendWidth + numberMargin * 2;
+  const svgHeight = exportHeight * cellSize + numberMargin * 2;
+  const fontSize = Math.max(8, Math.min(14, cellSize * 0.5));
 
   // Create color lookup map
   const colorMap = new Map(palette.map((p) => [p.id, p]));
@@ -44,6 +49,7 @@ export function exportProjectToSVG(project: Project, options: SVGExportOptions):
       .cell { stroke: none; }
       .grid-line { stroke: ${settings.gridLines.color}; stroke-width: 1; fill: none; }
       .legend-text { font-family: sans-serif; font-size: 12px; }
+      .number-text { font-family: monospace; font-size: ${fontSize}px; fill: #666666; }
     </style>
   </defs>
 
@@ -61,7 +67,7 @@ export function exportProjectToSVG(project: Project, options: SVGExportOptions):
       if (cell?.colorId) {
         const paletteEntry = colorMap.get(cell.colorId);
         if (paletteEntry) {
-          svg += `    <rect class="cell" x="${col * cellSize}" y="${row * cellSize}" width="${cellSize}" height="${cellSize}" fill="${paletteEntry.color}" />\n`;
+          svg += `    <rect class="cell" x="${gridOffsetX + col * cellSize}" y="${gridOffsetY + row * cellSize}" width="${cellSize}" height="${cellSize}" fill="${paletteEntry.color}" />\n`;
         }
       }
     }
@@ -78,12 +84,52 @@ export function exportProjectToSVG(project: Project, options: SVGExportOptions):
 
     // Vertical lines
     for (let col = 0; col <= exportWidth; col++) {
-      svg += `    <line class="grid-line" x1="${col * cellSize}" y1="0" x2="${col * cellSize}" y2="${exportHeight * cellSize}" />\n`;
+      svg += `    <line class="grid-line" x1="${gridOffsetX + col * cellSize}" y1="${gridOffsetY}" x2="${gridOffsetX + col * cellSize}" y2="${gridOffsetY + exportHeight * cellSize}" />\n`;
     }
 
     // Horizontal lines
     for (let row = 0; row <= exportHeight; row++) {
-      svg += `    <line class="grid-line" x1="0" y1="${row * cellSize}" x2="${exportWidth * cellSize}" y2="${row * cellSize}" />\n`;
+      svg += `    <line class="grid-line" x1="${gridOffsetX}" y1="${gridOffsetY + row * cellSize}" x2="${gridOffsetX + exportWidth * cellSize}" y2="${gridOffsetY + row * cellSize}" />\n`;
+    }
+
+    svg += `  </g>\n`;
+  }
+
+  // Draw row/column numbers if enabled
+  if (showNumbers) {
+    svg += `
+  <!-- Row/Column Numbers -->
+  <g id="numbers">
+`;
+
+    // Row numbers (left and right sides)
+    // Crochet style: row 1 at bottom, row N at top
+    for (let row = 0; row < exportHeight; row++) {
+      const displayRowNum = selection
+        ? (settings.height - (startRow + row))
+        : (exportHeight - row);
+      const y = gridOffsetY + row * cellSize + cellSize / 2;
+
+      // Left side
+      svg += `    <text class="number-text" x="${gridOffsetX - 4}" y="${y}" text-anchor="end" dominant-baseline="middle">${displayRowNum}</text>\n`;
+
+      // Right side
+      svg += `    <text class="number-text" x="${gridOffsetX + exportWidth * cellSize + 4}" y="${y}" text-anchor="start" dominant-baseline="middle">${displayRowNum}</text>\n`;
+    }
+
+    // Column numbers (top and bottom sides)
+    // Crochet style: column 1 on right, column N on left
+    for (let col = 0; col < exportWidth; col++) {
+      const displayColNum = selection
+        ? (settings.width - (startCol + col))
+        : (exportWidth - col);
+      const x = gridOffsetX + col * cellSize + cellSize / 2;
+
+      // Top
+      svg += `    <text class="number-text" x="${x}" y="${gridOffsetY - 4}" text-anchor="middle" dominant-baseline="auto">${displayColNum}</text>\n`;
+
+      // Bottom
+      svg += `    <text class="number-text" x="${x}" y="${gridOffsetY + exportHeight * cellSize + fontSize + 4}" text-anchor="middle" dominant-baseline="auto">${displayColNum}</text>\n`;
     }
 
     svg += `  </g>\n`;
@@ -91,7 +137,7 @@ export function exportProjectToSVG(project: Project, options: SVGExportOptions):
 
   // Draw legend
   if (includeLegend && palette.length > 0) {
-    const legendX = exportWidth * cellSize + 10;
+    const legendX = gridOffsetX + exportWidth * cellSize + numberMargin + 10;
     const legendCellSize = 20;
     const lineHeight = 24;
 

@@ -50,10 +50,14 @@ export function exportProjectToPNG(
       : SIZE_MAP[options.size];
 
     const legendWidth = includeLegend ? 150 : 0;
-    const cellSize = Math.floor((targetWidth - legendWidth) / exportWidth);
+    const showNumbers = settings.showNumbers ?? false;
+    const numberMargin = showNumbers ? 30 : 0; // Space for row/column numbers
+    const cellSize = Math.floor((targetWidth - legendWidth - numberMargin * 2) / exportWidth);
 
-    const canvasWidth = exportWidth * cellSize + legendWidth;
-    const canvasHeight = exportHeight * cellSize;
+    const gridOffsetX = numberMargin; // Offset grid to make room for left numbers
+    const gridOffsetY = numberMargin; // Offset grid to make room for top numbers
+    const canvasWidth = exportWidth * cellSize + legendWidth + numberMargin * 2;
+    const canvasHeight = exportHeight * cellSize + numberMargin * 2;
 
     // Create canvas
     const canvas = document.createElement('canvas');
@@ -81,7 +85,7 @@ export function exportProjectToPNG(
           const paletteEntry = colorMap.get(cell.colorId);
           if (paletteEntry) {
             ctx.fillStyle = paletteEntry.color;
-            ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+            ctx.fillRect(gridOffsetX + col * cellSize, gridOffsetY + row * cellSize, cellSize, cellSize);
           }
         }
       }
@@ -95,23 +99,65 @@ export function exportProjectToPNG(
       // Vertical lines
       for (let col = 0; col <= exportWidth; col++) {
         ctx.beginPath();
-        ctx.moveTo(col * cellSize, 0);
-        ctx.lineTo(col * cellSize, exportHeight * cellSize);
+        ctx.moveTo(gridOffsetX + col * cellSize, gridOffsetY);
+        ctx.lineTo(gridOffsetX + col * cellSize, gridOffsetY + exportHeight * cellSize);
         ctx.stroke();
       }
 
       // Horizontal lines
       for (let row = 0; row <= exportHeight; row++) {
         ctx.beginPath();
-        ctx.moveTo(0, row * cellSize);
-        ctx.lineTo(exportWidth * cellSize, row * cellSize);
+        ctx.moveTo(gridOffsetX, gridOffsetY + row * cellSize);
+        ctx.lineTo(gridOffsetX + exportWidth * cellSize, gridOffsetY + row * cellSize);
         ctx.stroke();
+      }
+    }
+
+    // Draw row/column numbers if enabled
+    if (showNumbers) {
+      const fontSize = Math.max(8, Math.min(14, cellSize * 0.5));
+      ctx.font = `${fontSize}px monospace`;
+      ctx.fillStyle = '#666666';
+      ctx.textBaseline = 'middle';
+
+      // Row numbers (left and right sides)
+      // Crochet style: row 1 at bottom, row N at top
+      for (let row = 0; row < exportHeight; row++) {
+        const displayRowNum = selection
+          ? (settings.height - (startRow + row))  // Account for selection offset
+          : (exportHeight - row);
+        const y = gridOffsetY + row * cellSize + cellSize / 2;
+
+        // Left side
+        ctx.textAlign = 'right';
+        ctx.fillText(String(displayRowNum), gridOffsetX - 4, y);
+
+        // Right side
+        ctx.textAlign = 'left';
+        ctx.fillText(String(displayRowNum), gridOffsetX + exportWidth * cellSize + 4, y);
+      }
+
+      // Column numbers (top and bottom sides)
+      // Crochet style: column 1 on right, column N on left
+      ctx.textBaseline = 'middle';
+      for (let col = 0; col < exportWidth; col++) {
+        const displayColNum = selection
+          ? (settings.width - (startCol + col))  // Account for selection offset
+          : (exportWidth - col);
+        const x = gridOffsetX + col * cellSize + cellSize / 2;
+
+        // Top
+        ctx.textAlign = 'center';
+        ctx.fillText(String(displayColNum), x, gridOffsetY - fontSize);
+
+        // Bottom
+        ctx.fillText(String(displayColNum), x, gridOffsetY + exportHeight * cellSize + fontSize);
       }
     }
 
     // Draw legend
     if (includeLegend && palette.length > 0) {
-      const legendX = exportWidth * cellSize + 10;
+      const legendX = gridOffsetX + exportWidth * cellSize + numberMargin + 10;
       const legendCellSize = 20;
       const lineHeight = 24;
 

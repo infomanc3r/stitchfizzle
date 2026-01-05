@@ -49,8 +49,12 @@ export async function exportProjectToPDF(
   const gridY = pages === 1 ? 1 : pages === 4 ? 2 : pages === 9 ? 3 : 4;
 
   // Single-page content area
-  const contentWidth = pageWidth - 2 * margin;
-  const contentHeight = pageHeight - 2 * margin - (includeLegend ? 40 : 0);
+  const showNumbers = settings.showNumbers ?? false;
+  const numberMargin = showNumbers ? 8 : 0;
+  const contentWidth = pageWidth - 2 * margin - numberMargin * 2;
+  const contentHeight = pageHeight - 2 * margin - (includeLegend ? 40 : 0) - numberMargin * 2;
+  const gridOffsetX = margin + numberMargin;
+  const gridOffsetY = margin + numberMargin;
 
   // Create PDF
   const pdf = new jsPDF({
@@ -94,8 +98,8 @@ export async function exportProjectToPDF(
             if (paletteEntry) {
               pdf.setFillColor(paletteEntry.color);
               pdf.rect(
-                margin + (col - pageStartCol) * pageCellSize,
-                margin + (row - pageStartRow) * pageCellSize,
+                gridOffsetX + (col - pageStartCol) * pageCellSize,
+                gridOffsetY + (row - pageStartRow) * pageCellSize,
                 pageCellSize,
                 pageCellSize,
                 'F'
@@ -113,27 +117,64 @@ export async function exportProjectToPDF(
         // Vertical lines
         for (let col = 0; col <= pageCellsX; col++) {
           pdf.line(
-            margin + col * pageCellSize,
-            margin,
-            margin + col * pageCellSize,
-            margin + pageCellsY * pageCellSize
+            gridOffsetX + col * pageCellSize,
+            gridOffsetY,
+            gridOffsetX + col * pageCellSize,
+            gridOffsetY + pageCellsY * pageCellSize
           );
         }
 
         // Horizontal lines
         for (let row = 0; row <= pageCellsY; row++) {
           pdf.line(
-            margin,
-            margin + row * pageCellSize,
-            margin + pageCellsX * pageCellSize,
-            margin + row * pageCellSize
+            gridOffsetX,
+            gridOffsetY + row * pageCellSize,
+            gridOffsetX + pageCellsX * pageCellSize,
+            gridOffsetY + row * pageCellSize
           );
+        }
+      }
+
+      // Draw row/column numbers if enabled
+      if (showNumbers) {
+        const fontSize = Math.max(4, Math.min(8, pageCellSize * 0.4));
+        pdf.setFontSize(fontSize);
+        pdf.setTextColor(100, 100, 100);
+
+        // Row numbers (left and right sides)
+        // Crochet style: row 1 at bottom, row N at top
+        for (let row = pageStartRow; row < pageEndRow; row++) {
+          const displayRowNum = selection
+            ? (settings.height - (startRow + row))
+            : (exportHeight - row);
+          const y = gridOffsetY + (row - pageStartRow) * pageCellSize + pageCellSize / 2 + fontSize / 4;
+
+          // Left side
+          pdf.text(String(displayRowNum), gridOffsetX - 2, y, { align: 'right' });
+
+          // Right side
+          pdf.text(String(displayRowNum), gridOffsetX + pageCellsX * pageCellSize + 2, y, { align: 'left' });
+        }
+
+        // Column numbers (top and bottom sides)
+        // Crochet style: column 1 on right, column N on left
+        for (let col = pageStartCol; col < pageEndCol; col++) {
+          const displayColNum = selection
+            ? (settings.width - (startCol + col))
+            : (exportWidth - col);
+          const x = gridOffsetX + (col - pageStartCol) * pageCellSize + pageCellSize / 2;
+
+          // Top
+          pdf.text(String(displayColNum), x, gridOffsetY - 2, { align: 'center' });
+
+          // Bottom
+          pdf.text(String(displayColNum), x, gridOffsetY + pageCellsY * pageCellSize + fontSize + 2, { align: 'center' });
         }
       }
 
       // Draw legend on first page only
       if (includeLegend && pageX === 0 && pageY === 0 && palette.length > 0) {
-        const legendY = margin + pageCellsY * pageCellSize + 5;
+        const legendY = gridOffsetY + pageCellsY * pageCellSize + numberMargin + 5;
         const legendCellSize = 5;
         const colWidth = 50;
 

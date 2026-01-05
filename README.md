@@ -46,6 +46,40 @@ npm run build
 
 The built files will be in the `dist/` directory.
 
+### Desktop App (Tauri)
+
+StitchFizzle can also run as a native desktop application using Tauri.
+
+#### Prerequisites
+
+- [Rust](https://www.rust-lang.org/tools/install) (latest stable)
+- Platform-specific dependencies:
+  - **Windows**: Microsoft Visual Studio C++ Build Tools
+  - **macOS**: Xcode Command Line Tools
+  - **Linux**: `sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev`
+
+#### Development
+
+```bash
+npm run tauri dev
+```
+
+This launches the app in a native window with hot-reload enabled.
+
+#### Building Installers
+
+```bash
+npm run tauri build
+```
+
+This creates platform-specific installers in `src-tauri/target/release/bundle/`:
+
+| Platform | Output |
+|----------|--------|
+| Windows  | `.exe` (standalone), `.msi` installer, NSIS installer |
+| macOS    | `.app` bundle, `.dmg` installer |
+| Linux    | `.deb`, `.rpm`, `.AppImage` |
+
 ## Tech Stack
 
 - **React 19** + TypeScript
