@@ -238,7 +238,7 @@ export function Toolbar() {
         </button>
       </div>
 
-      {/* Export & Instructions */}
+      {/* Export, Share & Instructions */}
       <div className="flex items-center gap-1 flex-shrink-0">
         <button
           onClick={() => openDialog('writtenInstructions')}
@@ -253,8 +253,16 @@ export function Toolbar() {
           title="Export chart"
           className="px-3 h-9 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg flex items-center gap-2"
         >
-          <span>📤</span>
+          <span>💾</span>
           <span>Export</span>
+        </button>
+        <button
+          onClick={() => openDialog('share')}
+          title="Share pattern (QR code, link, or native share)"
+          className="px-3 h-9 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg flex items-center gap-2"
+        >
+          <span>📤</span>
+          <span>Share</span>
         </button>
       </div>
 

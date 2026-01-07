@@ -4,14 +4,14 @@ import { ProjectList, NewProjectDialog } from '@/components/FileManager';
 import { GridCanvas, FreeformCanvas, Toolbar } from '@/components/Editor';
 import { PalettePanel, SymbolPicker } from '@/components/Palette';
 import { LayerPanel } from '@/components/Layers';
-import { ExportDialog, ImportDialog, WrittenInstructionsDialog } from '@/components/Export';
+import { ExportDialog, ImportDialog, WrittenInstructionsDialog, ShareDialog, URLImportDialog } from '@/components/Export';
 import { ImageImportDialog } from '@/components/Import';
 import { ProgressPanel } from '@/components/Progress';
 import { SettingsDialog } from '@/components/Settings';
 import { useUIStore } from '@/stores/uiStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useProjectStore } from '@/stores/projectStore';
-import { useKeyboardShortcuts, useAutoSave } from '@/hooks';
+import { useKeyboardShortcuts, useAutoSave, useURLImport } from '@/hooks';
 import type { SymbolDefinition } from '@/types';
 
 function App() {
@@ -19,6 +19,22 @@ function App() {
   const activeDialog = useUIStore((state) => state.activeDialog);
   const loadSettings = useSettingsStore((state) => state.loadSettings);
   const project = useProjectStore((state) => state.project);
+
+  // URL import handling (for shared pattern links)
+  const { pendingProject, clearPending } = useURLImport();
+  const [showURLImport, setShowURLImport] = useState(false);
+
+  // Show URL import dialog when there's a pending project
+  useEffect(() => {
+    if (pendingProject) {
+      setShowURLImport(true);
+    }
+  }, [pendingProject]);
+
+  const handleURLImportClose = () => {
+    setShowURLImport(false);
+    clearPending();
+  };
 
   // Load settings on mount
   useEffect(() => {
@@ -43,6 +59,12 @@ function App() {
       {activeDialog === 'imageImport' && <ImageImportDialog />}
       {activeDialog === 'writtenInstructions' && <WrittenInstructionsDialog />}
       {activeDialog === 'settings' && <SettingsDialog />}
+      {activeDialog === 'share' && <ShareDialog />}
+
+      {/* URL Import dialog (shown when opening a shared link) */}
+      {showURLImport && pendingProject && (
+        <URLImportDialog project={pendingProject} onClose={handleURLImportClose} />
+      )}
     </MainLayout>
   );
 }
