@@ -3,8 +3,7 @@ import { exportProjectToJSON } from '@/services/exporters/json';
 import { compressProject } from './compression';
 
 // Size thresholds
-export const URL_MAX_LENGTH = 2000; // Safe for all browsers
-export const QR_MAX_BYTES = 2500; // QR practical limit with error correction
+export const URL_MAX_LENGTH = 8000; // Modern browsers support much longer URLs
 
 export interface ShareCapabilities {
   webShare: boolean;

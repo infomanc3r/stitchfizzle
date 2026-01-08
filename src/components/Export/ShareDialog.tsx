@@ -6,19 +6,25 @@ import {
   shareViaWebShare,
   generateShareURL,
   copyURLToClipboard,
-  QR_MAX_BYTES,
 } from '@/services/sharing/share';
-import { generateProjectQRCode } from '@/services/sharing/qrcode';
+import { generateProjectQRCode, canGenerateQRCode } from '@/services/sharing/qrcode';
 import { compressProject } from '@/services/sharing/compression';
 
 type ShareMethod = 'native' | 'qr' | 'link';
+
+// Detect if we're likely on a mobile device where Web Share works well
+function isMobileDevice(): boolean {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent
+  );
+}
 
 export function ShareDialog() {
   const project = useProjectStore((state) => state.project);
   const closeDialog = useUIStore((state) => state.closeDialog);
   const addToast = useUIStore((state) => state.addToast);
 
-  const [activeMethod, setActiveMethod] = useState<ShareMethod>('native');
+  const [activeMethod, setActiveMethod] = useState<ShareMethod>('link');
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -30,13 +36,19 @@ export function ShareDialog() {
   } | null>(null);
 
   const capabilities = getShareCapabilities();
+  // Only show native share on mobile devices where it actually works
+  const showNativeShare = capabilities.webShare && isMobileDevice();
 
-  // Set default method based on capabilities
+  // Set default method based on capabilities and device
   useEffect(() => {
-    if (!capabilities.webShare) {
-      setActiveMethod(sizeInfo?.canQR ? 'qr' : 'link');
+    if (showNativeShare) {
+      setActiveMethod('native');
+    } else if (sizeInfo?.canURL) {
+      setActiveMethod('link');
+    } else if (sizeInfo?.canQR) {
+      setActiveMethod('qr');
     }
-  }, [capabilities.webShare, sizeInfo?.canQR]);
+  }, [showNativeShare, sizeInfo?.canQR, sizeInfo?.canURL]);
 
   // Calculate sizes on mount
   useEffect(() => {
@@ -48,7 +60,7 @@ export function ShareDialog() {
     setSizeInfo({
       original: compression.originalSize,
       compressed: compression.compressedSize,
-      canQR: compression.compressedSize <= QR_MAX_BYTES,
+      canQR: canGenerateQRCode(project),
       canURL: !urlResult.tooLarge,
     });
 
@@ -125,7 +137,7 @@ export function ShareDialog() {
 
         {/* Method tabs */}
         <div className="flex gap-2 mb-4">
-          {capabilities.webShare && (
+          {showNativeShare && (
             <button
               onClick={() => setActiveMethod('native')}
               className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
@@ -165,7 +177,7 @@ export function ShareDialog() {
 
         {/* Content based on active method */}
         <div className="mb-6">
-          {activeMethod === 'native' && capabilities.webShare && (
+          {activeMethod === 'native' && showNativeShare && (
             <div className="text-center py-8">
               <div className="text-5xl mb-4">📤</div>
               <p className="text-gray-600 dark:text-gray-300 mb-4">
@@ -188,7 +200,7 @@ export function ShareDialog() {
                   <div className="text-4xl mb-3">📱</div>
                   <p>Pattern too large for QR code.</p>
                   <p className="text-sm mt-2">
-                    Try reducing the grid size or use another sharing method.
+                    Try reducing the grid size or use the Link tab instead.
                   </p>
                 </div>
               ) : isLoading ? (
@@ -212,7 +224,15 @@ export function ShareDialog() {
                     Download QR Image
                   </button>
                 </>
-              ) : null}
+              ) : (
+                <div className="text-gray-500 dark:text-gray-400">
+                  <div className="text-4xl mb-3">⚠️</div>
+                  <p>QR code generation failed.</p>
+                  <p className="text-sm mt-2">
+                    The pattern may be too complex. Try using the Link tab instead.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

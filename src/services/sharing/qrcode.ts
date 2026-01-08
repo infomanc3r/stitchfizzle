@@ -1,7 +1,6 @@
 import QRCode from 'qrcode';
 import type { Project } from '@/types';
 import { compressProject } from './compression';
-import { QR_MAX_BYTES } from './share';
 
 export interface QRCodeResult {
   dataUrl: string | null;
@@ -16,6 +15,10 @@ export interface QRCodeOptions {
   margin?: number;
 }
 
+// QR code max characters for alphanumeric with error correction L is ~4296
+// But URLs use mixed case so it's treated as binary, max ~2953 bytes
+const QR_MAX_URL_LENGTH = 2500;
+
 /**
  * Generate a QR code containing a shareable URL with compressed pattern data
  * Returns null dataUrl if the pattern is too large for QR encoding
@@ -28,8 +31,8 @@ export async function generateProjectQRCode(
   const baseUrl = window.location.origin + window.location.pathname;
   const url = `${baseUrl}#share/${compression.compressed}`;
 
-  // Check if data fits in QR code
-  if (compression.compressedSize > QR_MAX_BYTES) {
+  // Check if full URL fits in QR code (not just compressed data)
+  if (url.length > QR_MAX_URL_LENGTH) {
     return {
       dataUrl: null,
       tooLarge: true,
@@ -40,8 +43,8 @@ export async function generateProjectQRCode(
 
   try {
     const dataUrl = await QRCode.toDataURL(url, {
-      width: options.width ?? 256,
-      errorCorrectionLevel: options.errorCorrectionLevel ?? 'M',
+      width: options.width ?? 300,
+      errorCorrectionLevel: options.errorCorrectionLevel ?? 'L', // L for max capacity
       margin: options.margin ?? 2,
     });
 
@@ -51,7 +54,8 @@ export async function generateProjectQRCode(
       compressedSize: compression.compressedSize,
       url,
     };
-  } catch {
+  } catch (err) {
+    console.error('QR code generation failed:', err);
     return {
       dataUrl: null,
       tooLarge: true,
@@ -66,5 +70,7 @@ export async function generateProjectQRCode(
  */
 export function canGenerateQRCode(project: Project): boolean {
   const compression = compressProject(project);
-  return compression.compressedSize <= QR_MAX_BYTES;
+  const baseUrl = window.location.origin + window.location.pathname;
+  const url = `${baseUrl}#share/${compression.compressed}`;
+  return url.length <= QR_MAX_URL_LENGTH;
 }
