@@ -397,51 +397,137 @@ export function GridCanvas() {
     // Draw progress overlay
     const progressTracker = project.progressTracker;
     if (progressTracker && progressTracker.darkenMode !== 'none') {
-      const { currentRow, darkenMode, brightness } = progressTracker;
+      const { currentRow: currentPosition, darkenMode, brightness, direction, diagonalDirection } = progressTracker;
       const opacity = (100 - brightness) / 100;
 
-      for (let row = startRow; row < endRow; row++) {
-        let shouldDarken = false;
-
+      const shouldDarkenPosition = (position: number): boolean => {
         switch (darkenMode) {
           case 'done':
-            shouldDarken = row < currentRow;
-            break;
+            return position < currentPosition;
           case 'todo':
-            shouldDarken = row > currentRow;
-            break;
+            return position > currentPosition;
           case 'except-current':
-            shouldDarken = row !== currentRow;
-            break;
+            return position !== currentPosition;
+          default:
+            return false;
         }
+      };
 
-        if (shouldDarken) {
-          const overlay = new Rect({
-            left: offsetX + startCol * scaledCellSize,
-            top: offsetY + row * scaledCellSize,
-            width: (endCol - startCol) * scaledCellSize,
+      if (direction === 'horizontal') {
+        // Horizontal: darken rows
+        for (let row = startRow; row < endRow; row++) {
+          if (shouldDarkenPosition(row)) {
+            const overlay = new Rect({
+              left: offsetX + startCol * scaledCellSize,
+              top: offsetY + row * scaledCellSize,
+              width: (endCol - startCol) * scaledCellSize,
+              height: scaledCellSize,
+              fill: `rgba(0, 0, 0, ${opacity})`,
+              selectable: false,
+              evented: false,
+            });
+            canvas.add(overlay);
+          }
+        }
+        // Highlight current row
+        if (currentPosition >= 0 && currentPosition < height) {
+          const currentRowRect = new Rect({
+            left: offsetX,
+            top: offsetY + currentPosition * scaledCellSize,
+            width: width * scaledCellSize,
             height: scaledCellSize,
-            fill: `rgba(0, 0, 0, ${opacity})`,
+            fill: 'transparent',
+            stroke: '#22C55E',
+            strokeWidth: 3,
             selectable: false,
             evented: false,
           });
-          canvas.add(overlay);
+          canvas.add(currentRowRect);
+        }
+      } else if (direction === 'vertical') {
+        // Vertical: darken columns
+        for (let col = startCol; col < endCol; col++) {
+          if (shouldDarkenPosition(col)) {
+            const overlay = new Rect({
+              left: offsetX + col * scaledCellSize,
+              top: offsetY + startRow * scaledCellSize,
+              width: scaledCellSize,
+              height: (endRow - startRow) * scaledCellSize,
+              fill: `rgba(0, 0, 0, ${opacity})`,
+              selectable: false,
+              evented: false,
+            });
+            canvas.add(overlay);
+          }
+        }
+        // Highlight current column
+        if (currentPosition >= 0 && currentPosition < width) {
+          const currentColRect = new Rect({
+            left: offsetX + currentPosition * scaledCellSize,
+            top: offsetY,
+            width: scaledCellSize,
+            height: height * scaledCellSize,
+            fill: 'transparent',
+            stroke: '#22C55E',
+            strokeWidth: 3,
+            selectable: false,
+            evented: false,
+          });
+          canvas.add(currentColRect);
+        }
+      } else if (direction === 'diagonal') {
+        // Diagonal: darken cells based on diagonal index
+        const getDiagonalIndex = (row: number, col: number): number => {
+          if (diagonalDirection === 'top-left') {
+            return row + col;
+          } else {
+            // bottom-left (default)
+            return (height - 1 - row) + col;
+          }
+        };
+
+        // Darken cells in visible area based on their diagonal
+        for (let row = startRow; row < endRow; row++) {
+          for (let col = startCol; col < endCol; col++) {
+            const diagIndex = getDiagonalIndex(row, col);
+            if (shouldDarkenPosition(diagIndex)) {
+              const overlay = new Rect({
+                left: offsetX + col * scaledCellSize,
+                top: offsetY + row * scaledCellSize,
+                width: scaledCellSize,
+                height: scaledCellSize,
+                fill: `rgba(0, 0, 0, ${opacity})`,
+                selectable: false,
+                evented: false,
+              });
+              canvas.add(overlay);
+            }
+          }
+        }
+
+        // Highlight current diagonal cells
+        const totalDiagonals = height + width - 1;
+        if (currentPosition >= 0 && currentPosition < totalDiagonals) {
+          for (let row = 0; row < height; row++) {
+            for (let col = 0; col < width; col++) {
+              if (getDiagonalIndex(row, col) === currentPosition) {
+                const highlightRect = new Rect({
+                  left: offsetX + col * scaledCellSize,
+                  top: offsetY + row * scaledCellSize,
+                  width: scaledCellSize,
+                  height: scaledCellSize,
+                  fill: 'transparent',
+                  stroke: '#22C55E',
+                  strokeWidth: 2,
+                  selectable: false,
+                  evented: false,
+                });
+                canvas.add(highlightRect);
+              }
+            }
+          }
         }
       }
-
-      // Highlight current row
-      const currentRowRect = new Rect({
-        left: offsetX,
-        top: offsetY + currentRow * scaledCellSize,
-        width: width * scaledCellSize,
-        height: scaledCellSize,
-        fill: 'transparent',
-        stroke: '#22C55E',
-        strokeWidth: 3,
-        selectable: false,
-        evented: false,
-      });
-      canvas.add(currentRowRect);
     }
 
     // Draw selection overlay

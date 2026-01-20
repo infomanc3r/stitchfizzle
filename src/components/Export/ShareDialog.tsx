@@ -135,7 +135,7 @@ export function ShareDialog() {
           )}
         </div>
 
-        {/* Method tabs */}
+        {/* Method tabs - Link first (default on desktop), QR Code last */}
         <div className="flex gap-2 mb-4">
           {showNativeShare && (
             <button
@@ -150,18 +150,6 @@ export function ShareDialog() {
             </button>
           )}
           <button
-            onClick={() => sizeInfo?.canQR && setActiveMethod('qr')}
-            disabled={!sizeInfo?.canQR}
-            title={!sizeInfo?.canQR ? 'Pattern too large for QR code' : undefined}
-            className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-              activeMethod === 'qr'
-                ? 'bg-blue-500 text-white'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-            } ${!sizeInfo?.canQR ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            QR Code
-          </button>
-          <button
             onClick={() => sizeInfo?.canURL && setActiveMethod('link')}
             disabled={!sizeInfo?.canURL}
             title={!sizeInfo?.canURL ? 'Pattern too large for link sharing' : undefined}
@@ -173,9 +161,21 @@ export function ShareDialog() {
           >
             Link
           </button>
+          <button
+            onClick={() => sizeInfo?.canQR && setActiveMethod('qr')}
+            disabled={!sizeInfo?.canQR}
+            title={!sizeInfo?.canQR ? 'Pattern too large for QR code' : undefined}
+            className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+              activeMethod === 'qr'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+            } ${!sizeInfo?.canQR ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            QR Code
+          </button>
         </div>
 
-        {/* Content based on active method */}
+        {/* Content based on active method - order matches tabs: native, link, qr */}
         <div className="mb-6">
           {activeMethod === 'native' && showNativeShare && (
             <div className="text-center py-8">
@@ -190,6 +190,43 @@ export function ShareDialog() {
               >
                 {isLoading ? 'Sharing...' : 'Share Pattern'}
               </button>
+            </div>
+          )}
+
+          {activeMethod === 'link' && (
+            <div className="py-4">
+              {!sizeInfo?.canURL ? (
+                <div className="text-center text-gray-500 dark:text-gray-400">
+                  <div className="text-4xl mb-3">🔗</div>
+                  <p>Pattern too large for link sharing.</p>
+                  <p className="text-sm mt-2">
+                    Large patterns need to be shared as files. Use the Export menu to save as JSON.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+                    Copy this link to share your pattern. Anyone with the link can import it.
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={shareUrl || ''}
+                      readOnly
+                      className="flex-1 px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-700 dark:text-gray-300 truncate"
+                    />
+                    <button
+                      onClick={handleCopyLink}
+                      className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                    The pattern data is encoded in the URL - no server required!
+                  </p>
+                </>
+              )}
             </div>
           )}
 
@@ -232,43 +269,6 @@ export function ShareDialog() {
                     The pattern may be too complex. Try using the Link tab instead.
                   </p>
                 </div>
-              )}
-            </div>
-          )}
-
-          {activeMethod === 'link' && (
-            <div className="py-4">
-              {!sizeInfo?.canURL ? (
-                <div className="text-center text-gray-500 dark:text-gray-400">
-                  <div className="text-4xl mb-3">🔗</div>
-                  <p>Pattern too large for link sharing.</p>
-                  <p className="text-sm mt-2">
-                    Large patterns need to be shared as files. Use the Export menu to save as JSON.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
-                    Copy this link to share your pattern. Anyone with the link can import it.
-                  </p>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={shareUrl || ''}
-                      readOnly
-                      className="flex-1 px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-700 dark:text-gray-300 truncate"
-                    />
-                    <button
-                      onClick={handleCopyLink}
-                      className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                    >
-                      Copy
-                    </button>
-                  </div>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-                    The pattern data is encoded in the URL - no server required!
-                  </p>
-                </>
               )}
             </div>
           )}

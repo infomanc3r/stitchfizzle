@@ -71,6 +71,7 @@ export interface PaletteEntry {
 // Progress tracker state
 export interface ProgressState {
   direction: 'horizontal' | 'vertical' | 'diagonal';
+  diagonalDirection?: 'bottom-left' | 'top-left';
   currentRow: number;
   darkenMode: 'todo' | 'done' | 'except-current' | 'none';
   brightness: number;

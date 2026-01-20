@@ -681,6 +681,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
     const defaultProgress: ProgressState = {
       direction: 'horizontal',
+      diagonalDirection: 'bottom-left',
       currentRow: 0,
       darkenMode: 'done',
       brightness: 50,
@@ -700,8 +701,23 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const { project } = get();
     if (!project?.progressTracker) return;
 
-    const maxRow = project.settings.height - 1;
-    const clampedRow = Math.max(0, Math.min(maxRow, row));
+    // Calculate max position based on direction
+    const { direction } = project.progressTracker;
+    const { width, height } = project.settings;
+    let maxPosition: number;
+    switch (direction) {
+      case 'vertical':
+        maxPosition = width - 1;
+        break;
+      case 'diagonal':
+        maxPosition = height + width - 2;
+        break;
+      case 'horizontal':
+      default:
+        maxPosition = height - 1;
+        break;
+    }
+    const clampedRow = Math.max(0, Math.min(maxPosition, row));
 
     set({
       project: {
