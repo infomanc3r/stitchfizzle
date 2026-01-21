@@ -2,6 +2,8 @@
 
 A free, open-source crochet chart creator. Design C2C, colorwork, filet, mosaic, freeform, and Tunisian crochet patterns locally with no account required.
 
+> **Note:** [www.stitchfizzle.com](https://www.stitchfizzle.com) is for **demo and testing purposes only**. It's hosted on GitHub Pages and not intended to handle regular traffic. Please download and use the app locally to avoid unnecessary bandwidth usage. Thank you for understanding!
+
 ## Features
 
 - **6 Chart Types**: Corner-to-Corner (C2C), Colorwork, Filet, Overlay Mosaic, Freeform, and Tunisian
@@ -13,45 +15,30 @@ A free, open-source crochet chart creator. Design C2C, colorwork, filet, mosaic,
 - **Progress Tracker**: Track your progress while crocheting
 - **Written Instructions**: Auto-generate row-by-row text patterns
 - **Dark Mode**: Easy on the eyes
-- **100% Local**: All data stored in your browser, no account needed
+- **100% Local**: All data stored locally, no account needed
 
 ## Getting Started
 
-### Prerequisites
+### Download (Recommended)
 
-- Node.js 18+ (recommended: 20+)
-- npm or yarn
+The easiest way to use StitchFizzle is to download the pre-built desktop app for your platform:
 
-### Installation
+**[Download Latest Release](https://github.com/infomanc3r/stitchfizzle/releases/latest)**
 
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/stitchfizzle.git
-cd stitchfizzle
+| Platform | Download |
+|----------|----------|
+| Windows  | `.exe` or `.msi` installer |
+| macOS    | `.dmg` installer |
+| Linux    | `.deb`, `.rpm`, or `.AppImage` |
 
-# Install dependencies
-npm install
+### Build Desktop App (Tauri)
 
-# Start development server
-npm run dev
-```
-
-Visit `http://localhost:5173` in your browser.
-
-### Build for Production
-
-```bash
-npm run build
-```
-
-The built files will be in the `dist/` directory.
-
-### Desktop App (Tauri)
-
-StitchFizzle can also run as a native desktop application using Tauri.
+If you prefer to build from source, StitchFizzle runs as a native desktop application using Tauri.
 
 #### Prerequisites
 
+- Node.js 18+ (recommended: 20+)
+- npm or yarn
 - [Rust](https://www.rust-lang.org/tools/install) (latest stable)
 - Platform-specific dependencies:
   - **Windows**: Microsoft Visual Studio C++ Build Tools
@@ -61,10 +48,16 @@ StitchFizzle can also run as a native desktop application using Tauri.
 #### Development
 
 ```bash
+# Clone the repository
+git clone https://github.com/infomanc3r/stitchfizzle.git
+cd stitchfizzle
+
+# Install dependencies
+npm install
+
+# Launch desktop app with hot-reload
 npm run tauri dev
 ```
-
-This launches the app in a native window with hot-reload enabled.
 
 #### Building Installers
 
@@ -80,6 +73,32 @@ This creates platform-specific installers in `src-tauri/target/release/bundle/`:
 | macOS    | `.app` bundle, `.dmg` installer |
 | Linux    | `.deb`, `.rpm`, `.AppImage` |
 
+### Web Development (Contributors)
+
+For contributors who want to work on the web version:
+
+```bash
+# Clone the repository
+git clone https://github.com/infomanc3r/stitchfizzle.git
+cd stitchfizzle
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+Visit `http://localhost:5173` in your browser.
+
+#### Build for Production
+
+```bash
+npm run build
+```
+
+The built files will be in the `dist/` directory.
+
 ## Tech Stack
 
 - **React 19** + TypeScript
@@ -88,7 +107,7 @@ This creates platform-specific installers in `src-tauri/target/release/bundle/`:
 - **Fabric.js** for canvas rendering
 - **Dexie** (IndexedDB) for local storage
 - **Zustand** for state management
-- **Tauri** (optional) for desktop builds
+- **Tauri** for desktop builds
 
 ## Project Structure
 
@@ -105,10 +124,6 @@ src/
 ├── hooks/           # Custom React hooks
 └── utils/           # Utility functions
 ```
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
