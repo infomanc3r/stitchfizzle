@@ -1,6 +1,6 @@
 [package]
 name = "stitchfizzle"
-version = "0.1.0"
+version = "0.1.1"
 description = "A free, open-source crochet chart creator"
 authors = ["StitchFizzle Contributors"]
 license = "MIT"
